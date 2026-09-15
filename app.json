@@ -1,0 +1,32 @@
+{
+  "expo": {
+    "name": "Jordan XC Clinic",
+    "slug": "jordan-xc-clinic",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "scheme": "jordanxc",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.jordanxcclinic.app"
+    },
+    "android": {
+      "package": "com.jordanxcclinic.app",
+      "adaptiveIcon": {
+        "backgroundColor": "#1B4D3E",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro",
+      "output": "single"
+    },
+    "plugins": ["expo-router"]
+  }
+}
