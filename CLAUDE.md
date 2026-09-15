@@ -3,7 +3,13 @@
 # Jordan XC Clinic
 
 Mobile app for a summer cross country clinic for Birmingham-area youth runners,
-plus a separate one-on-one coaching tier. Ships to the App Store and Google Play.
+plus a one-on-one coaching tier. Ships to the App Store and Google Play.
+
+**The app is an information hub, not a storefront.** Registration, payment, and
+the liability waiver all happen on jordanxcclinic.com. The app exists so athletes
+and parents have the schedule, training, and clinic news in one place for the
+summer. Do not add signup, checkout, or waiver flows here — if a feature would
+duplicate the website, it belongs on the website.
 
 ## Stack
 
@@ -25,10 +31,12 @@ role, because hiding a tab is not authorization — RLS is.
 
 ## Athletes are minors
 
-Most users are under 18. `consents` records a per-season waiver with a typed
-signature, timestamp, and a separate media-release flag (the clinic posts to
-Instagram). Guardians reach their own athlete's records through `can_view_athlete()`;
-coaches see everyone. Never widen athlete visibility without checking that function.
+Most users are under 18, so visibility is the thing to get right. Guardians reach
+their own athlete's records through `can_view_athlete()`; coaches see everyone;
+nobody else sees an athlete at all. Never widen athlete visibility without going
+through that function. Be conservative about what the app collects — it needs far
+less about a minor than a registration system does, and the registration system
+already lives elsewhere.
 
 ## Conventions
 

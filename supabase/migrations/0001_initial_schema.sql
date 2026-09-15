@@ -1,5 +1,6 @@
 -- Jordan XC Clinic — initial schema
--- Roles, athletes/guardians, consent, schedule, attendance, content, training plans.
+-- Roles, athletes/guardians, schedule, attendance, content, training plans.
+-- Registration, payment, and the waiver live on the website, not here.
 
 create type app_role as enum ('admin', 'coach', 'athlete', 'private_client', 'parent');
 create type practice_status as enum ('scheduled', 'moved', 'cancelled');
@@ -16,7 +17,7 @@ create table profiles (
   created_at timestamptz not null default now()
 );
 
--- A minor's account is reachable by their guardian; drives consent and visibility.
+-- Lets a parent see their own athlete's schedule, training, and attendance.
 create table guardian_links (
   id uuid primary key default gen_random_uuid(),
   athlete_id uuid not null references profiles on delete cascade,
@@ -24,19 +25,6 @@ create table guardian_links (
   relationship text,
   created_at timestamptz not null default now(),
   unique (athlete_id, guardian_id)
-);
-
--- Signed once per season. Stored with timestamp and the name typed as signature.
-create table consents (
-  id uuid primary key default gen_random_uuid(),
-  athlete_id uuid not null references profiles on delete cascade,
-  signed_by uuid not null references profiles on delete restrict,
-  season text not null,
-  waiver_version text not null,
-  signature_name text not null,
-  media_release boolean not null default false,
-  signed_at timestamptz not null default now(),
-  unique (athlete_id, season, waiver_version)
 );
 
 create table practices (
@@ -151,7 +139,6 @@ $$;
 
 alter table profiles enable row level security;
 alter table guardian_links enable row level security;
-alter table consents enable row level security;
 alter table practices enable row level security;
 alter table attendance enable row level security;
 alter table announcements enable row level security;
@@ -168,11 +155,6 @@ create policy profiles_update_self on profiles for update
 
 create policy guardian_links_select on guardian_links for select
   using (guardian_id = auth.uid() or can_view_athlete(auth.uid(), athlete_id));
-
-create policy consents_select on consents for select
-  using (can_view_athlete(auth.uid(), athlete_id));
-create policy consents_insert on consents for insert
-  with check (signed_by = auth.uid());
 
 create policy practices_select on practices for select using (true);
 create policy practices_write on practices for all
