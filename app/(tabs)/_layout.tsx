@@ -4,9 +4,10 @@ import { isCoach } from '../../lib/types';
 import { colors } from '../../lib/theme';
 
 export default function TabsLayout() {
-  const { session, role, loading } = useAuth();
+  const { session, profile, role, loading, profileLoaded } = useAuth();
 
   if (!loading && !session) return <Redirect href="/sign-in" />;
+  if (session && profileLoaded && !profile) return <Redirect href="/onboarding" />;
 
   return (
     <Tabs

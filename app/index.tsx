@@ -4,9 +4,9 @@ import { useAuth } from '../lib/auth';
 import { colors } from '../lib/theme';
 
 export default function Index() {
-  const { session, loading } = useAuth();
+  const { session, profile, loading, profileLoaded } = useAuth();
 
-  if (loading) {
+  if (loading || (session && !profileLoaded)) {
     return (
       <View style={styles.center}>
         <ActivityIndicator color={colors.primary} />
@@ -14,7 +14,12 @@ export default function Index() {
     );
   }
 
-  return <Redirect href={session ? '/(tabs)' : '/sign-in'} />;
+  if (!session) return <Redirect href="/sign-in" />;
+
+  // Signed in with Apple or Google but no roster record yet — they still owe a code.
+  if (!profile) return <Redirect href="/onboarding" />;
+
+  return <Redirect href="/(tabs)" />;
 }
 
 const styles = StyleSheet.create({

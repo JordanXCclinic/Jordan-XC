@@ -1,87 +1,63 @@
 import { useState } from 'react';
-import { router } from 'expo-router';
-import {
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
+import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { isSupabaseConfigured } from '../lib/supabase';
-import { useAuth } from '../lib/auth';
+import { PROVIDER_LABELS, signInWithProvider, type OAuthProvider } from '../lib/oauth';
 import { colors, radius, spacing } from '../lib/theme';
 
-export default function SignIn() {
-  const { signIn } = useAuth();
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
+// Apple requires Sign in with Apple wherever a third-party login is offered
+// on iOS (App Store guideline 4.8), so it leads on that platform.
+const PROVIDERS: OAuthProvider[] =
+  Platform.OS === 'ios' ? ['apple', 'google'] : ['google', 'apple'];
 
-  async function onSubmit() {
-    setBusy(true);
+export default function SignIn() {
+  const [busy, setBusy] = useState<OAuthProvider | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  async function onPress(provider: OAuthProvider) {
+    setBusy(provider);
     setError(null);
-    const { error: signInError } = await signIn(email.trim(), password);
-    setBusy(false);
-    if (signInError) {
-      setError(signInError);
-      return;
-    }
-    router.replace('/(tabs)');
+    const { error: signInError } = await signInWithProvider(provider);
+    setBusy(null);
+    if (signInError) setError(signInError);
   }
 
   return (
-    <KeyboardAvoidingView
-      style={styles.root}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-    >
+    <View style={styles.root}>
       <View style={styles.card}>
         <Text style={styles.brand}>Jordan XC Clinic</Text>
-        <Text style={styles.subtitle}>Sign in to see your training, schedule, and updates.</Text>
+        <Text style={styles.subtitle}>
+          Your schedule, training, and clinic news for the summer.
+        </Text>
 
         {!isSupabaseConfigured ? (
           <Text style={styles.warning}>
             Backend not configured yet. Add EXPO_PUBLIC_SUPABASE_URL and
-            EXPO_PUBLIC_SUPABASE_ANON_KEY to .env to enable sign-in.
+            EXPO_PUBLIC_SUPABASE_ANON_KEY to .env, and enable the Apple and Google
+            providers in Supabase.
           </Text>
         ) : null}
 
-        <TextInput
-          style={styles.input}
-          placeholder="Email"
-          placeholderTextColor={colors.textMuted}
-          autoCapitalize="none"
-          keyboardType="email-address"
-          autoComplete="email"
-          value={email}
-          onChangeText={setEmail}
-        />
-        <TextInput
-          style={styles.input}
-          placeholder="Password"
-          placeholderTextColor={colors.textMuted}
-          secureTextEntry
-          value={password}
-          onChangeText={setPassword}
-        />
+        {PROVIDERS.map((provider) => (
+          <Pressable
+            key={provider}
+            style={[styles.button, busy !== null && styles.buttonDisabled]}
+            onPress={() => onPress(provider)}
+            disabled={busy !== null}
+          >
+            <Text style={styles.buttonText}>
+              {busy === provider ? 'Opening…' : PROVIDER_LABELS[provider]}
+            </Text>
+          </Pressable>
+        ))}
 
         {error ? <Text style={styles.error}>{error}</Text> : null}
 
-        <Pressable
-          style={[styles.button, busy && styles.buttonDisabled]}
-          onPress={onSubmit}
-          disabled={busy}
-        >
-          <Text style={styles.buttonText}>{busy ? 'Signing in…' : 'Sign in'}</Text>
-        </Pressable>
-
         <Text style={styles.help}>
-          Athletes and families receive an account from a coach. Contact the clinic if you need access.
+          After signing in you will be asked for the clinic code from your
+          registration confirmation.
         </Text>
       </View>
-    </KeyboardAvoidingView>
+    </View>
   );
 }
 
@@ -94,7 +70,7 @@ const styles = StyleSheet.create({
     gap: spacing.md,
   },
   brand: { fontSize: 26, fontWeight: '700', color: colors.text },
-  subtitle: { fontSize: 15, color: colors.textMuted },
+  subtitle: { fontSize: 15, color: colors.textMuted, lineHeight: 21 },
   warning: {
     fontSize: 13,
     color: colors.text,
@@ -102,15 +78,6 @@ const styles = StyleSheet.create({
     borderRadius: radius.sm,
     padding: spacing.md,
     lineHeight: 19,
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.sm,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.md,
-    fontSize: 16,
-    color: colors.text,
   },
   button: {
     backgroundColor: colors.primary,

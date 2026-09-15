@@ -1,14 +1,18 @@
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { isSupabaseConfigured, supabase } from './supabase';
 import type { AppRole, Profile } from './types';
+
+const PROFILE_COLUMNS = 'id, full_name, role, date_of_birth, phone, graduation_year';
 
 type AuthState = {
   session: Session | null;
   profile: Profile | null;
   role: AppRole | undefined;
   loading: boolean;
-  signIn: (email: string, password: string) => Promise<{ error: string | null }>;
+  /** False until the profile lookup for the current session has resolved. */
+  profileLoaded: boolean;
+  refreshProfile: () => Promise<void>;
   signOut: () => Promise<void>;
 };
 
@@ -18,6 +22,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [profileLoaded, setProfileLoaded] = useState(false);
 
   useEffect(() => {
     if (!isSupabaseConfigured) {
@@ -37,19 +42,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => listener.subscription.unsubscribe();
   }, []);
 
-  useEffect(() => {
-    if (!session?.user) {
+  const userId = session?.user?.id;
+
+  const loadProfile = useCallback(async () => {
+    if (!userId) {
       setProfile(null);
+      setProfileLoaded(true);
       return;
     }
+    const { data } = await supabase.from('profiles').select(PROFILE_COLUMNS).eq('id', userId).maybeSingle();
+    setProfile((data as Profile | null) ?? null);
+    setProfileLoaded(true);
+  }, [userId]);
 
-    supabase
-      .from('profiles')
-      .select('id, full_name, role, date_of_birth, phone, graduation_year')
-      .eq('id', session.user.id)
-      .single()
-      .then(({ data }) => setProfile(data as Profile | null));
-  }, [session?.user?.id]);
+  useEffect(() => {
+    setProfileLoaded(false);
+    void loadProfile();
+  }, [loadProfile]);
 
   const value = useMemo<AuthState>(
     () => ({
@@ -57,15 +66,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       profile,
       role: profile?.role,
       loading,
-      signIn: async (email, password) => {
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
-        return { error: error?.message ?? null };
-      },
+      profileLoaded,
+      refreshProfile: loadProfile,
       signOut: async () => {
         await supabase.auth.signOut();
       },
     }),
-    [session, profile, loading]
+    [session, profile, loading, profileLoaded, loadProfile]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -19,6 +19,21 @@ duplicate the website, it belongs on the website.
 - Web target is SPA (`output: "single"`), not static — routes are auth-gated, so
   prerendering them in Node breaks on browser globals and buys nothing.
 
+## Access
+
+Download the app, sign in with Apple or Google, then redeem a clinic code
+issued after registering on the website. There are no passwords.
+
+The code carries the role, so `profiles.role` is writable only by
+`redeem_invite_code()` — a SECURITY DEFINER function. Column-level grants leave
+name and phone self-editable and everything else locked. Never add a client
+write path to `role`; that reopens a privilege escalation the tests cover.
+
+Athlete and parent codes share a `family_id`, and the guardian link forms
+whichever of the two redeems first, so neither has to go first.
+
+`supabase/tests/` runs against a plain Postgres and must stay green.
+
 ## Roles
 
 `admin` and `coach` are staff. `athlete` is a clinic participant. `private_client`
