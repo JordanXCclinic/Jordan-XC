@@ -10,7 +10,8 @@ export default function CoachLayout() {
       }}
     >
       <Stack.Screen name="index" options={{ headerShown: false }} />
-      <Stack.Screen name="codes" options={{ title: 'Clinic codes' }} />
+      {/* The screen renders its own large title, so the bar keeps just the back control. */}
+      <Stack.Screen name="codes" options={{ title: '' }} />
     </Stack>
   );
 }
