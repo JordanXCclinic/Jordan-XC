@@ -53,5 +53,15 @@ export type Workout = {
   intensity: string | null;
 };
 
+export type InviteCode = {
+  id: string;
+  code: string;
+  role: AppRole;
+  full_name: string;
+  season: string;
+  redeemed_at: string | null;
+  expires_at: string | null;
+};
+
 export const isCoach = (role: AppRole | undefined): boolean =>
   role === 'admin' || role === 'coach';

@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'expo-router';
 import { StyleSheet, Text, View } from 'react-native';
-import { EmptyState, Screen } from '../../components/Screen';
-import { useAuth } from '../../lib/auth';
-import { isSupabaseConfigured, supabase } from '../../lib/supabase';
-import { isCoach, type Profile } from '../../lib/types';
-import { colors, radius, spacing } from '../../lib/theme';
+import { EmptyState, Screen } from '../../../components/Screen';
+import { useAuth } from '../../../lib/auth';
+import { isSupabaseConfigured, supabase } from '../../../lib/supabase';
+import { isCoach, type Profile } from '../../../lib/types';
+import { colors, radius, spacing } from '../../../lib/theme';
 
-export default function Coach() {
+export default function CoachHome() {
   const { role } = useAuth();
   const [roster, setRoster] = useState<Profile[]>([]);
 
@@ -30,8 +31,12 @@ export default function Coach() {
 
   return (
     <Screen title="Coach" subtitle={`${roster.length} athletes on the roster`}>
+      <Link href="/(tabs)/coach/codes" style={styles.action}>
+        <Text style={styles.actionText}>Issue clinic codes</Text>
+      </Link>
+
       {roster.length === 0 ? (
-        <EmptyState message="No athletes yet. Once accounts are created they will show up here." />
+        <EmptyState message="No athletes yet. Issue a code to a registered family to get them in." />
       ) : (
         roster.map((athlete) => (
           <View key={athlete.id} style={styles.row}>
@@ -48,6 +53,14 @@ export default function Coach() {
 }
 
 const styles = StyleSheet.create({
+  action: {
+    backgroundColor: colors.primary,
+    borderRadius: radius.sm,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.md,
+    textAlign: 'center',
+  },
+  actionText: { color: '#FFFFFF', fontSize: 16, fontWeight: '600' },
   row: {
     backgroundColor: colors.surface,
     borderRadius: radius.md,

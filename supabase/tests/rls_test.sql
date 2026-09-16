@@ -117,3 +117,68 @@ begin
 end $$;
 
 reset role;
+
+-- Code generation (0003).
+
+\set newathlete '''55555555-5555-5555-5555-555555555555'''
+\set newparent  '''66666666-6666-6666-6666-666666666666'''
+
+insert into auth.users (id) values (:newathlete), (:newparent);
+
+create table issued (athlete_code text, parent_code text);
+grant all on issued to authenticated;
+
+set role authenticated;
+select set_config('request.jwt.claim.sub', :coach, false);
+insert into issued select * from create_family_codes('New Runner', '2026');
+
+do $$
+declare a text; p text;
+begin
+  select athlete_code, parent_code into a, p from issued;
+  if a ~ '^[ABCDEFGHJKLMNPQR]{10}$' and p ~ '^[ABCDEFGHJKLMNPQR]{10}$' and a <> p
+  then raise notice 'PASS: generated codes are well formed and distinct';
+  else raise notice 'FAIL: malformed codes a=% p=%', a, p;
+  end if;
+end $$;
+
+-- An athlete must not be able to mint codes for anyone.
+select set_config('request.jwt.claim.sub', :athlete, false);
+do $$
+begin
+  perform create_family_codes('Sneaky Runner', '2026');
+  raise notice 'FAIL: a non-coach generated invite codes';
+exception when others then
+  raise notice 'PASS: non-coach cannot generate codes (%)', sqlerrm;
+end $$;
+
+-- The generated pair must work end to end.
+do $$
+declare a text; p text;
+begin
+  select athlete_code, parent_code into a, p from issued;
+
+  perform set_config('request.jwt.claim.sub', '55555555-5555-5555-5555-555555555555', false);
+  perform redeem_invite_code(a);
+
+  perform set_config('request.jwt.claim.sub', '66666666-6666-6666-6666-666666666666', false);
+  perform redeem_invite_code(p);
+
+  if (select role from profiles where id = '55555555-5555-5555-5555-555555555555') = 'athlete'
+     and (select role from profiles where id = '66666666-6666-6666-6666-666666666666') = 'parent'
+  then raise notice 'PASS: generated codes assign the right roles';
+  else raise notice 'FAIL: generated codes assigned wrong roles';
+  end if;
+end $$;
+
+reset role;
+do $$
+declare n int;
+begin
+  select count(*) into n from guardian_links
+   where athlete_id = '55555555-5555-5555-5555-555555555555'
+     and guardian_id = '66666666-6666-6666-6666-666666666666';
+  if n = 1 then raise notice 'PASS: generated pair links parent to athlete';
+  else raise notice 'FAIL: generated pair did not link (count %)', n;
+  end if;
+end $$;

@@ -1,6 +1,14 @@
 -- Minimal stand-in for the Supabase primitives the migrations rely on.
-create role anon;
-create role authenticated;
+-- Roles are cluster-wide, so they survive dropping the test database.
+do $$
+begin
+  if not exists (select 1 from pg_roles where rolname = 'anon') then
+    create role anon;
+  end if;
+  if not exists (select 1 from pg_roles where rolname = 'authenticated') then
+    create role authenticated;
+  end if;
+end $$;
 grant usage on schema public to anon, authenticated;
 alter default privileges in schema public grant all on tables to anon, authenticated;
 alter default privileges in schema public grant all on functions to anon, authenticated;
