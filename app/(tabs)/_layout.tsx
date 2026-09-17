@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Redirect, Tabs } from 'expo-router';
-import { Platform, StyleSheet, type ColorValue } from 'react-native';
+import { StyleSheet, type ColorValue } from 'react-native';
 import { FullScreenLoader } from '../../components/Screen';
 import { useAuth } from '../../lib/auth';
 import { isAthlete, isCoach } from '../../lib/types';
@@ -73,11 +73,8 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: colors.border,
-    height: Platform.OS === 'ios' ? 88 : 64,
-    paddingTop: spacing.sm,
-    paddingBottom: Platform.OS === 'ios' ? spacing.xl : spacing.sm,
     ...shadow.card,
   },
   label: { ...type.caption, fontSize: 11, fontWeight: '600' },
-  item: { paddingVertical: 2 },
+  item: {},
 });

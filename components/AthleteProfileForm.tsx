@@ -5,7 +5,8 @@ import { Button } from './Button';
 import { Card } from './Card';
 import { ChipSelect, TextField } from './Field';
 import { LoadingState } from './Screen';
-import { formatDuration, parseDuration } from '../lib/format';
+import { useAuth } from '../lib/auth';
+import { firstName, formatDuration, parseDuration } from '../lib/format';
 import { isSupabaseConfigured, supabase } from '../lib/supabase';
 import {
   ATHLETE_PROFILE_COLUMNS,
@@ -55,6 +56,10 @@ const GRADE_OPTIONS = GRADES.map((grade) => ({ value: grade, label: grade }));
  * so an edit later cannot drift from what was collected at setup.
  */
 export function AthleteProfileForm({ athleteId, athleteName, submitLabel, onSaved }: Props) {
+  const { profile } = useAuth();
+  // The same form is filled in by the athlete, a parent, and a coach, so it
+  // addresses whoever is actually holding the phone.
+  const self = profile?.id === athleteId;
   const [draft, setDraft] = useState<Draft>(EMPTY);
   const [times, setTimes] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
@@ -206,8 +211,9 @@ export function AthleteProfileForm({ athleteId, athleteName, submitLabel, onSave
       <Card>
         <Text style={styles.cardTitle}>Personal bests</Text>
         <Text style={styles.cardHint}>
-          Anything you have run. Leave the rest blank — {athleteName.split(' ')[0]} can add
-          them as the season goes.
+          {self
+            ? 'Anything you have run. Leave the rest blank \u2014 you can add them as the season goes.'
+            : `Anything ${firstName(athleteName)} has run. Leave the rest blank \u2014 they can be added as the season goes.`}
         </Text>
         <View style={styles.fields}>
           {PB_EVENTS.map((event) => (
@@ -228,7 +234,7 @@ export function AthleteProfileForm({ athleteId, athleteName, submitLabel, onSave
         <Text style={styles.cardTitle}>Goals</Text>
         <View style={styles.fields}>
           <TextField
-            label="What do you want out of this summer?"
+            label={self ? 'What do you want out of this summer?' : `What does ${firstName(athleteName)} want out of this summer?`}
             value={draft.goals}
             onChangeText={(next) => set('goals', next)}
             placeholder="Break 18:00 in the 5K and make varsity."
@@ -243,8 +249,9 @@ export function AthleteProfileForm({ athleteId, athleteName, submitLabel, onSave
           <Text style={styles.cardTitle}>Health</Text>
         </View>
         <Text style={styles.cardHint}>
-          Only you, your parent or guardian, and clinic staff can see this. It is here so
-          the coaches know what to watch for at practice.
+          {self
+            ? 'Only you, your parent or guardian, and clinic staff can see this. It is here so the coaches know what to watch for at practice.'
+            : `Only ${firstName(athleteName)}, their guardians, and clinic staff can see this. It is here so the coaches know what to watch for at practice.`}
         </Text>
         <View style={styles.fields}>
           <TextField
