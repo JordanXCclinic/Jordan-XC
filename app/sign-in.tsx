@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { Image } from 'expo-image';
 import * as WebBrowser from 'expo-web-browser';
 import { Ionicons } from '@expo/vector-icons';
 import {
@@ -12,6 +11,7 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Logo } from '../components/Logo';
 import { isSupabaseConfigured } from '../lib/supabase';
 import { signInWithProvider, type OAuthProvider } from '../lib/oauth';
 import { brand, colors, radius, shadow, spacing, type } from '../lib/theme';
@@ -60,15 +60,7 @@ export default function SignIn() {
       showsVerticalScrollIndicator={false}
     >
       <View style={styles.brandBlock}>
-        <View style={styles.logoRing}>
-          <Image
-            source={require('../assets/icon.png')}
-            style={styles.logo}
-            contentFit="contain"
-            transition={220}
-            accessibilityLabel="Jordan Cross Country Clinic"
-          />
-        </View>
+        <Logo size={148} ring label="Jordan Cross Country Clinic" />
         <Text style={styles.title}>Jordan Cross Country Clinic</Text>
         <Text style={styles.tagline}>
           Your schedule, training, and clinic news — all summer, in one place.
@@ -148,17 +140,6 @@ const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.primary },
   content: { flexGrow: 1, paddingHorizontal: spacing.xl, justifyContent: 'space-between', gap: spacing.xxl },
   brandBlock: { alignItems: 'center', gap: spacing.lg, paddingTop: spacing.xl },
-  logoRing: {
-    width: 148,
-    height: 148,
-    borderRadius: radius.pill,
-    backgroundColor: brand.white,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: spacing.md,
-    ...shadow.raised,
-  },
-  logo: { width: '100%', height: '100%' },
   title: {
     ...type.display,
     color: colors.textInverse,

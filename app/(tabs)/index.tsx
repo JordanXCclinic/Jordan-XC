@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Badge } from '../../components/Badge';
 import { Card } from '../../components/Card';
+import { Logo } from '../../components/Logo';
 import { EmptyState, Screen, SectionHeader } from '../../components/Screen';
 import { SegmentedControl } from '../../components/SegmentedControl';
 import { useAthlete } from '../../lib/athlete';
@@ -108,6 +109,7 @@ export default function Home() {
             : 'Here is what is next for your athlete'
       }
       onRefresh={load}
+      headerRight={<Logo size={46} />}
     >
       {athletes.length > 1 ? (
         <SegmentedControl

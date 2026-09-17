@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Logo } from '../../../components/Logo';
 import { EmptyState, Screen, SectionHeader } from '../../../components/Screen';
 import { useAuth } from '../../../lib/auth';
 import { firstName } from '../../../lib/format';
@@ -122,6 +123,7 @@ export default function CoachHome() {
       title={`Coach ${firstName(profile?.full_name)}`.trim()}
       subtitle="Everything the clinic runs on"
       onRefresh={load}
+      headerRight={<Logo size={46} />}
     >
       <View style={styles.stats}>
         <Stat label="Athletes" value={counts.athletes} />

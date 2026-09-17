@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button } from '../components/Button';
+import { Logo } from '../components/Logo';
 import { useAuth } from '../lib/auth';
 import { supabase } from '../lib/supabase';
 import { colors, radius, shadow, spacing, type } from '../lib/theme';
@@ -58,9 +59,7 @@ export default function Onboarding() {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.card}>
-          <View style={styles.badge}>
-            <Ionicons name="key" size={22} color={colors.primary} />
-          </View>
+          <Logo size={60} />
 
           <Text style={styles.title}>Enter your clinic code</Text>
           <Text style={styles.subtitle}>
@@ -132,14 +131,6 @@ const styles = StyleSheet.create({
     padding: spacing.xl,
     gap: spacing.lg,
     ...shadow.raised,
-  },
-  badge: {
-    width: 48,
-    height: 48,
-    borderRadius: radius.pill,
-    backgroundColor: colors.primaryTint,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   title: { ...type.title, color: colors.text },
   subtitle: { ...type.body, color: colors.textMuted },
