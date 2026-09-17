@@ -260,6 +260,28 @@ begin
   end if;
 end $$;
 
+-- Finishing setup writes the athlete's own name, phone, and onboarded_at in one
+-- statement. That is the exact update the app makes, and the column grants have
+-- to allow it without opening a door to role.
+select set_config('request.jwt.claim.sub', :athlete, false);
+do $$
+begin
+  update profiles
+     set full_name = 'Sam Runner', phone = '205-555-0134', onboarded_at = now()
+   where id = auth.uid();
+  raise notice 'PASS: athlete can finish their own setup';
+exception when others then
+  raise notice 'FAIL: athlete cannot complete setup (%)', sqlerrm;
+end $$;
+
+do $$
+begin
+  update profiles set onboarded_at = now(), role = 'coach' where id = auth.uid();
+  raise notice 'FAIL: role rode along with an onboarding update';
+exception when others then
+  raise notice 'PASS: role still cannot ride along with setup (%)', sqlerrm;
+end $$;
+
 -- Personal bests follow the same boundary.
 select set_config('request.jwt.claim.sub', :athlete, false);
 insert into personal_bests (athlete_id, event, result_seconds) values (:athlete, '5K', 1103);

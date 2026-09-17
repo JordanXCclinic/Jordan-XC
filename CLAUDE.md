@@ -22,7 +22,9 @@ duplicate the website, it belongs on the website.
 ## Access
 
 Download the app, sign in with Apple or Google, then redeem a clinic code
-issued after registering on the website. There are no passwords.
+issued after registering on the website, then fill in the intake form. There are
+no passwords. `profiles.onboarded_at` is what says the form is done; the tab
+layout redirects to `/profile-setup` until it is set.
 
 The code carries the role, so `profiles.role` is writable only by
 `redeem_invite_code()` — a SECURITY DEFINER function. Column-level grants leave
@@ -53,9 +55,17 @@ through that function. Be conservative about what the app collects — it needs 
 less about a minor than a registration system does, and the registration system
 already lives elsewhere.
 
+`athlete_profiles` holds the health information a coach needs at practice —
+injuries, medical notes, an emergency contact — and it is a separate table, not
+columns on `profiles`, so that boundary is one policy rather than a per-column
+argument. Photos are pictures of minors: the bucket is private and the app hands
+out short-lived signed URLs, never a public link. Keep both that way.
+
 ## Conventions
 
 - Screens live in `app/`, shared UI in `components/`, data and domain logic in `lib/`.
+- Colours, spacing, type, and shadows come from `lib/theme.ts`. Screens pick a
+  role (`type.heading`, `colors.primary`) rather than a raw hex or font size.
 - Every screen must render before a backend exists — check `isSupabaseConfigured`
   and show an empty state rather than crashing or hanging.
 - Schema changes go in `supabase/migrations/` as a new numbered file, never by
@@ -67,4 +77,6 @@ already lives elsewhere.
 A **practice** is a scheduled session. A **training plan** contains **workouts**
 keyed by week and day, assigned to an athlete via **plan_assignments**. An
 **announcement** is time-sensitive clinic news; a **post** is evergreen
-educational content (the Learn tab).
+educational content (the Learn tab). A **meeting slot** is a time the coach has
+opened for a one-on-one; a family claims one through `book_meeting_slot()`,
+which locks the row so two families cannot take the same time.

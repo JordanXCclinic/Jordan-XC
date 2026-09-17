@@ -1,10 +1,16 @@
 import { useCallback, useEffect, useState } from 'react';
 import * as Clipboard from 'expo-clipboard';
-import { Pressable, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
-import { EmptyState, Screen } from '../../../components/Screen';
+import { Ionicons } from '@expo/vector-icons';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Badge } from '../../../components/Badge';
+import { Button } from '../../../components/Button';
+import { Card } from '../../../components/Card';
+import { SwitchRow, TextField } from '../../../components/Field';
+import { EmptyState, LoadingState, Screen, SectionHeader } from '../../../components/Screen';
 import { isSupabaseConfigured, supabase } from '../../../lib/supabase';
-import { colors, radius, spacing } from '../../../lib/theme';
-import type { InviteCode } from '../../../lib/types';
+import { INVITE_CODE_COLUMNS, type InviteCode } from '../../../lib/types';
+import { roleLabel } from '../../../lib/format';
+import { colors, radius, spacing, type } from '../../../lib/theme';
 
 const SEASON = String(new Date().getFullYear());
 
@@ -17,21 +23,27 @@ export default function Codes() {
   const [codes, setCodes] = useState<InviteCode[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState<string | null>(null);
 
-  const loadCodes = useCallback(async () => {
-    if (!isSupabaseConfigured) return;
+  const load = useCallback(async () => {
+    if (!isSupabaseConfigured) {
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
     const { data } = await supabase
       .from('invite_codes')
-      .select('id, code, role, full_name, season, redeemed_at, expires_at')
+      .select(INVITE_CODE_COLUMNS)
       .order('created_at', { ascending: false })
-      .limit(50);
-    setCodes((data as InviteCode[]) ?? []);
+      .limit(60);
+    setCodes((data as InviteCode[] | null) ?? []);
+    setLoading(false);
   }, []);
 
   useEffect(() => {
-    void loadCodes();
-  }, [loadCodes]);
+    void load();
+  }, [load]);
 
   async function onGenerate() {
     setBusy(true);
@@ -54,55 +66,63 @@ export default function Codes() {
     if (row) {
       setIssued({ ...row, name: name.trim() });
       setName('');
-      void loadCodes();
+      setCopied(null);
+      await load();
     }
   }
 
-  async function copy(label: string, value: string) {
+  async function copy(key: string, value: string) {
     await Clipboard.setStringAsync(value);
-    setCopied(label);
+    setCopied(key);
   }
 
   const outstanding = codes.filter((code) => !code.redeemed_at);
 
   return (
-    <Screen title="Clinic codes" subtitle={`Season ${SEASON}`}>
-      <View style={styles.form}>
-        <Text style={styles.label}>Athlete name</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="Sam Runner"
-          placeholderTextColor={colors.textMuted}
-          value={name}
-          onChangeText={setName}
-        />
-
-        <View style={styles.switchRow}>
-          <Text style={styles.label}>One-on-one client</Text>
-          <Switch
+    <Screen
+      inStack
+      title="Clinic codes"
+      subtitle={`Season ${SEASON}. Issue a pair once a family has registered on the website.`}
+      onRefresh={load}
+      avoidKeyboard
+    >
+      <Card accent="primary">
+        <Text style={styles.cardTitle}>Issue a pair</Text>
+        <View style={styles.fields}>
+          <TextField
+            label="Athlete name"
+            value={name}
+            onChangeText={setName}
+            placeholder="Sam Runner"
+            required
+            autoCapitalize="words"
+          />
+          <SwitchRow
+            label="One-on-one client"
+            hint="Private coaching rather than the summer clinic."
             value={oneOnOne}
             onValueChange={setOneOnOne}
-            trackColor={{ true: colors.primaryLight, false: colors.border }}
           />
         </View>
 
-        <Pressable
-          style={[styles.button, (busy || !name.trim()) && styles.buttonDisabled]}
-          onPress={onGenerate}
-          disabled={busy || !name.trim()}
-        >
-          <Text style={styles.buttonText}>{busy ? 'Generating…' : 'Generate codes'}</Text>
-        </Pressable>
-
         {error ? <Text style={styles.error}>{error}</Text> : null}
-      </View>
+
+        <Button
+          label="Generate codes"
+          full
+          loading={busy}
+          disabled={!name.trim()}
+          onPress={onGenerate}
+          style={styles.submit}
+        />
+      </Card>
 
       {issued ? (
-        <View style={styles.issued}>
-          <Text style={styles.issuedTitle}>Codes for {issued.name}</Text>
-          <Text style={styles.issuedHint}>
-            Send the athlete code to the runner and the parent code to their
-            guardian. Each one works once.
+        <Card accent="primary">
+          <Text style={styles.cardTitle}>Codes for {issued.name}</Text>
+          <Text style={styles.hint}>
+            Send the athlete code to the runner and the parent code to their guardian. Each one
+            works once, and either can be redeemed first.
           </Text>
 
           {(
@@ -110,30 +130,66 @@ export default function Codes() {
               ['Athlete', issued.athlete_code],
               ['Parent', issued.parent_code],
             ] as const
-          ).map(([label, value]) => (
-            <Pressable key={label} style={styles.codeRow} onPress={() => copy(label, value)}>
-              <View>
-                <Text style={styles.codeLabel}>{label}</Text>
+          ).map(([kind, value]) => (
+            <Pressable
+              key={kind}
+              accessibilityRole="button"
+              accessibilityLabel={`Copy the ${kind.toLowerCase()} code`}
+              onPress={() => copy(kind, value)}
+              style={({ pressed }) => [styles.codeRow, pressed && styles.pressed]}
+            >
+              <View style={styles.codeText}>
+                <Text style={styles.codeLabel}>{kind}</Text>
                 <Text style={styles.code}>{value}</Text>
               </View>
-              <Text style={styles.copy}>{copied === label ? 'Copied' : 'Copy'}</Text>
+              <View style={styles.copy}>
+                <Ionicons
+                  name={copied === kind ? 'checkmark-circle' : 'copy-outline'}
+                  size={17}
+                  color={copied === kind ? colors.success : colors.primary}
+                />
+                <Text style={[styles.copyText, copied === kind && styles.copiedText]}>
+                  {copied === kind ? 'Copied' : 'Copy'}
+                </Text>
+              </View>
             </Pressable>
           ))}
-        </View>
+        </Card>
       ) : null}
 
-      <Text style={styles.sectionTitle}>Not yet used ({outstanding.length})</Text>
-      {outstanding.length === 0 ? (
-        <EmptyState message="Every code you have issued has been claimed." />
+      <SectionHeader title={`Not yet used (${outstanding.length})`} />
+
+      {loading ? (
+        <LoadingState />
+      ) : outstanding.length === 0 ? (
+        <EmptyState
+          icon="checkmark-done-outline"
+          message="Every code you have issued has been claimed."
+        />
       ) : (
         outstanding.map((code) => (
-          <View key={code.id} style={styles.row}>
-            <View>
-              <Text style={styles.name}>{code.full_name}</Text>
-              <Text style={styles.meta}>{code.role.replace('_', ' ')}</Text>
+          <Card key={code.id}>
+            <View style={styles.row}>
+              <View style={styles.codeText}>
+                <Text style={styles.name}>{code.full_name}</Text>
+                <Badge label={roleLabel(code.role)} />
+              </View>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={`Copy the code for ${code.full_name}`}
+                onPress={() => copy(code.id, code.code)}
+                hitSlop={8}
+                style={({ pressed }) => [styles.rowCodeWrap, pressed && styles.pressed]}
+              >
+                <Text style={styles.rowCode}>{code.code}</Text>
+                <Ionicons
+                  name={copied === code.id ? 'checkmark-circle' : 'copy-outline'}
+                  size={16}
+                  color={copied === code.id ? colors.success : colors.textFaint}
+                />
+              </Pressable>
             </View>
-            <Text style={styles.rowCode}>{code.code}</Text>
-          </View>
+          </Card>
         ))
       )}
     </Screen>
@@ -141,73 +197,30 @@ export default function Codes() {
 }
 
 const styles = StyleSheet.create({
-  form: {
-    backgroundColor: colors.surface,
-    borderRadius: radius.md,
-    padding: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    gap: spacing.sm,
-  },
-  label: { fontSize: 14, fontWeight: '600', color: colors.text },
-  input: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.sm,
-    backgroundColor: colors.background,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    fontSize: 16,
-    color: colors.text,
-  },
-  switchRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: spacing.xs,
-  },
-  button: {
-    backgroundColor: colors.primary,
-    borderRadius: radius.sm,
-    paddingVertical: spacing.md,
-    alignItems: 'center',
-  },
-  buttonDisabled: { opacity: 0.6 },
-  buttonText: { color: '#FFFFFF', fontSize: 16, fontWeight: '600' },
-  error: { color: colors.danger, fontSize: 14 },
-  issued: {
-    backgroundColor: colors.background,
-    borderRadius: radius.md,
-    padding: spacing.md,
-    borderWidth: 2,
-    borderColor: colors.primary,
-    gap: spacing.sm,
-  },
-  issuedTitle: { fontSize: 17, fontWeight: '700', color: colors.text },
-  issuedHint: { fontSize: 14, color: colors.textMuted, lineHeight: 20 },
+  cardTitle: { ...type.heading, color: colors.text },
+  hint: { ...type.caption, color: colors.textMuted, marginTop: spacing.xs, lineHeight: 17 },
+  fields: { gap: spacing.lg, marginTop: spacing.lg },
+  submit: { marginTop: spacing.lg },
+  error: { ...type.caption, color: colors.danger, marginTop: spacing.md },
   codeRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     backgroundColor: colors.surface,
-    borderRadius: radius.sm,
-    padding: spacing.md,
-  },
-  codeLabel: { fontSize: 13, color: colors.textMuted },
-  code: { fontSize: 20, fontWeight: '700', letterSpacing: 2, color: colors.text },
-  copy: { fontSize: 15, fontWeight: '600', color: colors.primary },
-  sectionTitle: { fontSize: 16, fontWeight: '700', color: colors.text, marginTop: spacing.sm },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: colors.surface,
     borderRadius: radius.md,
-    padding: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.border,
+    padding: spacing.lg,
+    marginTop: spacing.md,
+    gap: spacing.md,
   },
-  name: { fontSize: 15, fontWeight: '600', color: colors.text },
-  meta: { fontSize: 13, color: colors.textMuted, textTransform: 'capitalize' },
-  rowCode: { fontSize: 16, fontWeight: '700', letterSpacing: 1.5, color: colors.primary },
+  codeText: { flex: 1, gap: spacing.xs },
+  codeLabel: { ...type.caption, color: colors.textMuted },
+  code: { ...type.title, color: colors.text, letterSpacing: 3 },
+  copy: { alignItems: 'center', gap: 2 },
+  copyText: { ...type.caption, color: colors.primary, fontWeight: '700' },
+  copiedText: { color: colors.success },
+  pressed: { opacity: 0.7 },
+  row: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  name: { ...type.bodyStrong, color: colors.text },
+  rowCodeWrap: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  rowCode: { ...type.bodyStrong, color: colors.primary, letterSpacing: 1.5 },
 });

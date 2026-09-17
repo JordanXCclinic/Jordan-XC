@@ -1,0 +1,360 @@
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useLocalSearchParams } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
+import { Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import { Badge } from '../../../../components/Badge';
+import { Button } from '../../../../components/Button';
+import { Card } from '../../../../components/Card';
+import { ChipSelect, TextField } from '../../../../components/Field';
+import { DateTimeField } from '../../../../components/DateTimeField';
+import { EmptyState, LoadingState, Screen, SectionHeader } from '../../../../components/Screen';
+import { useAuth } from '../../../../lib/auth';
+import { PLAN_DAYS, formatMiles, planDayLabel, toDateInput } from '../../../../lib/format';
+import { isSupabaseConfigured, supabase } from '../../../../lib/supabase';
+import {
+  PROFILE_COLUMNS,
+  TRAINING_PLAN_COLUMNS,
+  WORKOUT_COLUMNS,
+  type Profile,
+  type TrainingPlan,
+  type Workout,
+} from '../../../../lib/types';
+import { colors, radius, spacing, type } from '../../../../lib/theme';
+
+const DAY_OPTIONS = PLAN_DAYS.map((label, index) => ({ value: String(index + 1), label }));
+
+/** Plans usually start on a Monday, so that is what the date field offers. */
+function nextMonday(): Date {
+  const date = new Date();
+  const ahead = (8 - (date.getDay() || 7)) % 7 || 7;
+  date.setDate(date.getDate() + ahead);
+  date.setHours(0, 0, 0, 0);
+  return date;
+}
+
+export default function PlanEditor() {
+  const { id } = useLocalSearchParams<{ id: string }>();
+  const { profile } = useAuth();
+
+  const [plan, setPlan] = useState<TrainingPlan | null>(null);
+  const [workouts, setWorkouts] = useState<Workout[]>([]);
+  const [athletes, setAthletes] = useState<Profile[]>([]);
+  const [assigned, setAssigned] = useState<Set<string>>(new Set());
+  const [loading, setLoading] = useState(true);
+
+  const [week, setWeek] = useState(1);
+  const [day, setDay] = useState('1');
+  const [title, setTitle] = useState('');
+  const [distance, setDistance] = useState('');
+  const [intensity, setIntensity] = useState('');
+  const [description, setDescription] = useState('');
+  const [startsOn, setStartsOn] = useState(nextMonday);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    if (!isSupabaseConfigured || !id) {
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+
+    const [{ data: planRow }, { data: workoutRows }, { data: athleteRows }, { data: assignRows }] =
+      await Promise.all([
+        supabase.from('training_plans').select(TRAINING_PLAN_COLUMNS).eq('id', id).maybeSingle(),
+        supabase
+          .from('workouts')
+          .select(WORKOUT_COLUMNS)
+          .eq('plan_id', id)
+          .order('week_number')
+          .order('day_of_week'),
+        supabase
+          .from('profiles')
+          .select(PROFILE_COLUMNS)
+          .in('role', ['athlete', 'private_client'])
+          .order('full_name'),
+        supabase.from('plan_assignments').select('athlete_id').eq('plan_id', id),
+      ]);
+
+    setPlan((planRow as TrainingPlan | null) ?? null);
+    setWorkouts((workoutRows as Workout[] | null) ?? []);
+    setAthletes((athleteRows as Profile[] | null) ?? []);
+    setAssigned(
+      new Set(((assignRows as { athlete_id: string }[] | null) ?? []).map((row) => row.athlete_id))
+    );
+    setLoading(false);
+  }, [id]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  // Always offer one week past what exists, so a plan can grow a week at a time.
+  const weeks = useMemo(() => {
+    const written = [...new Set(workouts.map((workout) => workout.week_number))];
+    const highest = written.length > 0 ? Math.max(...written) : 0;
+    return Array.from({ length: Math.max(highest + 1, 1) }, (_, index) => index + 1);
+  }, [workouts]);
+
+  const shown = useMemo(
+    () => workouts.filter((workout) => workout.week_number === week),
+    [workouts, week]
+  );
+
+  async function addWorkout() {
+    if (!id) return;
+    if (!title.trim()) {
+      setError('Give the workout a title.');
+      return;
+    }
+
+    const miles = distance.trim() ? Number(distance.trim()) : null;
+    if (miles !== null && (Number.isNaN(miles) || miles <= 0)) {
+      setError('Distance should be a number of miles, like 6 or 6.2.');
+      return;
+    }
+
+    setSaving(true);
+    setError(null);
+
+    // One workout per day per week, so re-adding a day replaces it rather than
+    // failing on the unique constraint.
+    const { error: upsertError } = await supabase.from('workouts').upsert(
+      {
+        plan_id: id,
+        week_number: week,
+        day_of_week: Number(day),
+        title: title.trim(),
+        description: description.trim() || null,
+        distance_miles: miles,
+        intensity: intensity.trim() || null,
+      },
+      { onConflict: 'plan_id,week_number,day_of_week' }
+    );
+
+    setSaving(false);
+    if (upsertError) {
+      setError(upsertError.message);
+      return;
+    }
+
+    setTitle('');
+    setDistance('');
+    setIntensity('');
+    setDescription('');
+    await load();
+  }
+
+  async function removeWorkout(workout: Workout) {
+    await supabase.from('workouts').delete().eq('id', workout.id);
+    await load();
+  }
+
+  async function toggleAssignment(athlete: Profile, next: boolean) {
+    if (!id || !profile) return;
+
+    if (next) {
+      await supabase.from('plan_assignments').upsert(
+        {
+          plan_id: id,
+          athlete_id: athlete.id,
+          starts_on: toDateInput(startsOn),
+          assigned_by: profile.id,
+        },
+        { onConflict: 'plan_id,athlete_id' }
+      );
+    } else {
+      await supabase.from('plan_assignments').delete().eq('plan_id', id).eq('athlete_id', athlete.id);
+    }
+    await load();
+  }
+
+  if (loading) {
+    return (
+      <Screen inStack>
+        <LoadingState />
+      </Screen>
+    );
+  }
+
+  if (!plan) {
+    return (
+      <Screen inStack>
+        <EmptyState icon="barbell-outline" message="That plan no longer exists." />
+      </Screen>
+    );
+  }
+
+  return (
+    <Screen inStack title={plan.name} subtitle={plan.description ?? undefined} avoidKeyboard>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.weeks}>
+        {weeks.map((number) => {
+          const selected = number === week;
+          const empty = !workouts.some((workout) => workout.week_number === number);
+          return (
+            <Pressable
+              key={number}
+              accessibilityRole="tab"
+              accessibilityState={{ selected }}
+              onPress={() => setWeek(number)}
+              style={[styles.weekChip, selected && styles.weekChipSelected]}
+            >
+              <Text style={[styles.weekText, selected && styles.weekTextSelected]}>
+                Week {number}
+                {empty ? ' +' : ''}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </ScrollView>
+
+      <Card accent="primary">
+        <Text style={styles.cardTitle}>Add a workout to week {week}</Text>
+        <View style={styles.fields}>
+          <ChipSelect label="Day" options={DAY_OPTIONS} value={day} onChange={setDay} />
+          <TextField
+            label="Workout"
+            value={title}
+            onChangeText={setTitle}
+            placeholder="6 x 800m at 5K effort"
+            required
+          />
+          <View style={styles.row}>
+            <View style={styles.half}>
+              <TextField
+                label="Miles"
+                value={distance}
+                onChangeText={setDistance}
+                placeholder="6"
+                keyboardType="decimal-pad"
+              />
+            </View>
+            <View style={styles.half}>
+              <TextField
+                label="Intensity"
+                value={intensity}
+                onChangeText={setIntensity}
+                placeholder="Hard"
+              />
+            </View>
+          </View>
+          <TextField
+            label="Details"
+            value={description}
+            onChangeText={setDescription}
+            placeholder="Two-minute jog recovery. Stop if form falls apart."
+            multiline
+          />
+        </View>
+
+        {error ? <Text style={styles.error}>{error}</Text> : null}
+
+        <Button label="Add workout" full loading={saving} onPress={addWorkout} style={styles.submit} />
+      </Card>
+
+      <SectionHeader title={`Week ${week}`} />
+
+      {shown.length === 0 ? (
+        <EmptyState icon="create-outline" message="Nothing written for this week yet." />
+      ) : (
+        shown.map((workout) => (
+          <Card key={workout.id}>
+            <View style={styles.head}>
+              <Text style={styles.day}>{planDayLabel(workout.day_of_week)}</Text>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={`Delete ${workout.title}`}
+                onPress={() => void removeWorkout(workout)}
+                hitSlop={8}
+              >
+                <Ionicons name="trash-outline" size={17} color={colors.danger} />
+              </Pressable>
+            </View>
+            <Text style={styles.workoutTitle}>{workout.title}</Text>
+            <View style={styles.metaRow}>
+              {formatMiles(workout.distance_miles) ? (
+                <Badge label={formatMiles(workout.distance_miles)!} tone="primary" />
+              ) : null}
+              {workout.intensity ? <Badge label={workout.intensity} /> : null}
+            </View>
+            {workout.description ? <Text style={styles.body}>{workout.description}</Text> : null}
+          </Card>
+        ))
+      )}
+
+      <SectionHeader title="Assigned to" />
+
+      <Card>
+        <DateTimeField
+          label="Week 1 starts on"
+          value={startsOn}
+          onChange={setStartsOn}
+          hint="Athletes turned on below start the plan from this date."
+        />
+      </Card>
+
+      {athletes.length === 0 ? (
+        <EmptyState icon="people-outline" message="No athletes on the roster yet." />
+      ) : (
+        athletes.map((athlete) => (
+          <View key={athlete.id} style={styles.assignRow}>
+            <View style={styles.assignText}>
+              <Text style={styles.assignName}>{athlete.full_name}</Text>
+              <Text style={styles.assignMeta}>
+                {athlete.role === 'private_client' ? 'One-on-one' : 'Clinic'}
+              </Text>
+            </View>
+            <Switch
+              value={assigned.has(athlete.id)}
+              onValueChange={(next) => void toggleAssignment(athlete, next)}
+              trackColor={{ true: colors.primary, false: colors.borderStrong }}
+              thumbColor={colors.background}
+              accessibilityLabel={`Assign ${plan.name} to ${athlete.full_name}`}
+            />
+          </View>
+        ))
+      )}
+    </Screen>
+  );
+}
+
+const styles = StyleSheet.create({
+  weeks: { gap: spacing.sm, paddingVertical: spacing.xs },
+  weekChip: {
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+  },
+  weekChipSelected: { backgroundColor: colors.primary, borderColor: colors.primary },
+  weekText: { ...type.label, color: colors.textMuted },
+  weekTextSelected: { color: colors.textInverse },
+  cardTitle: { ...type.heading, color: colors.text },
+  fields: { gap: spacing.lg, marginTop: spacing.lg },
+  row: { flexDirection: 'row', gap: spacing.md },
+  half: { flex: 1 },
+  submit: { marginTop: spacing.lg },
+  error: { ...type.caption, color: colors.danger, marginTop: spacing.md },
+  head: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  day: { ...type.overline, color: colors.textFaint },
+  workoutTitle: { ...type.heading, color: colors.text, marginTop: spacing.xs },
+  metaRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm, flexWrap: 'wrap' },
+  body: { ...type.body, color: colors.textMuted, marginTop: spacing.sm },
+  assignRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: colors.background,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    gap: spacing.md,
+  },
+  assignText: { flex: 1 },
+  assignName: { ...type.bodyStrong, color: colors.text },
+  assignMeta: { ...type.caption, color: colors.textMuted },
+});

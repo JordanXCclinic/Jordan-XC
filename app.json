@@ -8,6 +8,7 @@
     "scheme": "jordanxc",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
+    "primaryColor": "#003482",
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.jordanxcclinic.app"
@@ -15,7 +16,7 @@
     "android": {
       "package": "com.jordanxcclinic.app",
       "adaptiveIcon": {
-        "backgroundColor": "#1B4D3E",
+        "backgroundColor": "#003482",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
@@ -27,6 +28,24 @@
       "bundler": "metro",
       "output": "single"
     },
-    "plugins": ["expo-router"]
+    "plugins": [
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 180,
+          "resizeMode": "contain",
+          "backgroundColor": "#003482"
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Coaches choose photos from this device to share with the clinic.",
+          "cameraPermission": false
+        }
+      ]
+    ]
   }
 }
