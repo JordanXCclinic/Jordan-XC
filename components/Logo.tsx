@@ -12,13 +12,14 @@ type Props = {
 };
 
 /**
- * The clinic badge. Every placement reads the same file, so replacing
- * assets/icon.png updates the app icon and every on-screen mark at once.
+ * The clinic badge, as it appears inside the app. This reads the transparent
+ * logo rather than the app icon: the icon has to be an opaque square for iOS,
+ * and its corners would show through the circle on the sign-in screen.
  */
 export function Logo({ size = 44, ring, label, style }: Props) {
   const image = (
     <Image
-      source={require('../assets/icon.png')}
+      source={require('../assets/logo.png')}
       style={{ width: '100%', height: '100%' }}
       contentFit="contain"
       transition={220}

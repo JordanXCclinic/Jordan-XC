@@ -1,33 +1,44 @@
 # Assets
 
-**These are still the stock Expo placeholders.** The app is wired to the
-filenames below, so replacing a file is all it takes — no code change.
+Every icon here is generated from one file — **`logo-source.png`**, the clinic
+badge as supplied. Nothing else in this folder should be edited by hand.
 
-| File | What it is | Size |
+To change the logo, replace `logo-source.png` and run:
+
+```sh
+pip install Pillow     # once
+npm run icons
+```
+
+## What gets generated
+
+| File | Where it shows | Notes |
 |---|---|---|
-| `icon.png` | The clinic logo. Feeds the app icon **and** every mark inside the app — sign-in, the code screen, and the Home and Coach headers. | 1024×1024, square |
-| `splash-icon.png` | The mark on the navy splash screen. Needs a **transparent** background, unlike `icon.png`. | 1024×1024, transparent |
-| `android-icon-foreground.png` | The logo for the Android adaptive icon. | 1024×1024, transparent |
-| `android-icon-background.png` | Solid navy behind it. | 1024×1024 |
-| `android-icon-monochrome.png` | Single-colour silhouette for themed icons. | 1024×1024, transparent |
-| `favicon.png` | Browser tab icon for the web build. | 48×48 |
+| `icon.png` | App icon on the home screen | Opaque white square — iOS rejects an icon with transparency |
+| `logo.png` | Inside the app: sign-in, the code screen, the Home and Coach headers | Transparent, so it works on navy and on white |
+| `splash-icon.png` | The navy screen while the app opens | Transparent |
+| `android-icon-foreground.png` | Android adaptive icon | Sits inside the circular safe zone |
+| `android-icon-background.png` | Behind it | Flat brand navy `#003482` |
+| `android-icon-monochrome.png` | Android themed icons | See below |
+| `favicon.png` | Browser tab on the web build | 48×48 |
 
-Notes on the two that are easy to get wrong:
+## Two decisions worth knowing about
 
-- **`icon.png` must be square with no transparency.** iOS rejects an icon with
-  an alpha channel. The badge has rounded edges, so put it on a solid **white**
-  square. White is what makes the same file work in both jobs: as the app icon,
-  and in the app, where it sits either inside a white circle (sign-in) or on a
-  white page (Home and Coach), so the square edges never show.
-- **The splash is the one place that needs transparency**, because the mark sits
-  directly on navy. That is why `splash-icon.png` stays a separate file — a
-  white square would show as a white block behind the logo.
-- **Android's adaptive icon gets masked into a circle.** Keep the logo inside
-  the middle ~66% of `android-icon-foreground.png` or the edges get cut off.
-  The background is already navy (`#003482`) via `app.json`.
+**The app icon and the in-app mark are separate files.** iOS will not accept an
+app icon with an alpha channel, so `icon.png` is flattened onto white. But a
+white square inside the sign-in screen's white circle shows its corners poking
+out past the curve, so everything inside the app uses the transparent
+`logo.png` instead.
 
-After replacing them, rebuild — icons are baked in at build time and will not
-change over the air:
+**The themed icon is not the badge's outline.** Android tints that icon by its
+alpha channel, so using the badge's silhouette would give a solid blob with no
+runners in it. Instead it keeps only the dark artwork — the rings, the
+wordmark, and the red and navy runners. The white runner drops out, which reads
+as the gap between the other two, the way it does in the logo itself.
+
+## After changing the logo
+
+Rebuild. Icons are baked in at build time and will not update over the air:
 
 ```sh
 npx expo run:ios      # or: npx expo run:android
