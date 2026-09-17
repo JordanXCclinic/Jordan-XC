@@ -180,6 +180,8 @@ const styles = StyleSheet.create({
     color: colors.text,
   },
   webRow: { flexDirection: 'row', gap: spacing.md },
-  webDate: { flex: 2 },
-  webTime: { flex: 1 },
+  // minWidth 0 lets these shrink inside the row. Without it the inputs keep
+  // their content width and the time field runs off the edge of the card.
+  webDate: { flex: 2, minWidth: 0 },
+  webTime: { flex: 1, minWidth: 0 },
 });
