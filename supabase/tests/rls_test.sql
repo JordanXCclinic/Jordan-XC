@@ -182,3 +182,217 @@ begin
   else raise notice 'FAIL: generated pair did not link (count %)', n;
   end if;
 end $$;
+
+-- ---------------------------------------------------------------------------
+-- Intake forms and health information (0004).
+--
+-- athlete 22… and parent 33… are linked. athlete 55… is a real, unrelated
+-- athlete — a better probe than a user with no profile at all, because it is
+-- the case that actually happens: two families in the same clinic.
+-- ---------------------------------------------------------------------------
+
+set role authenticated;
+select set_config('request.jwt.claim.sub', :athlete, false);
+
+do $$
+begin
+  insert into athlete_profiles (athlete_id, school, grade, medical_notes, emergency_contact_name)
+  values (auth.uid(), 'Mountain Brook', '9th', 'Carries an inhaler', 'Pat Runner');
+  raise notice 'PASS: athlete can fill in their own intake form';
+exception when others then
+  raise notice 'FAIL: athlete cannot write own intake form (%)', sqlerrm;
+end $$;
+
+-- Guardians fill these in for younger runners, so they get write access too.
+select set_config('request.jwt.claim.sub', :parent, false);
+do $$
+declare v_notes text;
+begin
+  select medical_notes into v_notes from athlete_profiles
+   where athlete_id = '22222222-2222-2222-2222-222222222222';
+  if v_notes = 'Carries an inhaler'
+  then raise notice 'PASS: parent can read their athlete''s medical notes';
+  else raise notice 'FAIL: parent could not read medical notes (got %)', coalesce(v_notes, 'null');
+  end if;
+end $$;
+
+do $$
+begin
+  update athlete_profiles set goals = 'Break 18:00'
+   where athlete_id = '22222222-2222-2222-2222-222222222222';
+  if found then raise notice 'PASS: parent can update their athlete''s intake form';
+  else raise notice 'FAIL: parent update matched no rows';
+  end if;
+exception when others then
+  raise notice 'FAIL: parent cannot update intake form (%)', sqlerrm;
+end $$;
+
+-- The whole point of the separate table: another clinic family sees nothing.
+select set_config('request.jwt.claim.sub', :newathlete, false);
+do $$
+declare n int;
+begin
+  select count(*) into n from athlete_profiles
+   where athlete_id = '22222222-2222-2222-2222-222222222222';
+  if n = 0 then raise notice 'PASS: another athlete cannot read medical notes';
+  else raise notice 'FAIL: another athlete read % intake rows', n;
+  end if;
+end $$;
+
+do $$
+begin
+  insert into athlete_profiles (athlete_id, medical_notes)
+  values ('22222222-2222-2222-2222-222222222222', 'injected by a stranger');
+  raise notice 'FAIL: a stranger wrote to someone else''s intake form';
+exception when others then
+  raise notice 'PASS: stranger cannot write another athlete''s intake form (%)', sqlerrm;
+end $$;
+
+-- Staff see every athlete: they are the ones reading it at practice.
+select set_config('request.jwt.claim.sub', :coach, false);
+do $$
+declare n int;
+begin
+  select count(*) into n from athlete_profiles
+   where athlete_id = '22222222-2222-2222-2222-222222222222';
+  if n = 1 then raise notice 'PASS: coach can read athlete medical notes';
+  else raise notice 'FAIL: coach cannot read medical notes';
+  end if;
+end $$;
+
+-- Personal bests follow the same boundary.
+select set_config('request.jwt.claim.sub', :athlete, false);
+insert into personal_bests (athlete_id, event, result_seconds) values (:athlete, '5K', 1103);
+
+select set_config('request.jwt.claim.sub', :newathlete, false);
+do $$
+declare n int;
+begin
+  select count(*) into n from personal_bests
+   where athlete_id = '22222222-2222-2222-2222-222222222222';
+  if n = 0 then raise notice 'PASS: another athlete cannot read personal bests';
+  else raise notice 'FAIL: another athlete read % personal bests', n;
+  end if;
+end $$;
+
+-- ---------------------------------------------------------------------------
+-- Meeting slots (0005).
+-- ---------------------------------------------------------------------------
+
+reset role;
+insert into meeting_slots (id, starts_at, created_by) values
+  ('77777777-7777-7777-7777-777777777777', now() + interval '3 days', :coach),
+  ('88888888-8888-8888-8888-888888888888', now() + interval '4 days', :coach);
+-- A time that has already gone by must not be bookable.
+insert into meeting_slots (id, starts_at, created_by)
+values ('99999999-9999-9999-9999-999999999999', now() - interval '1 day', :coach);
+
+set role authenticated;
+
+-- A family must not be able to invent their own slot.
+select set_config('request.jwt.claim.sub', :parent, false);
+do $$
+begin
+  insert into meeting_slots (starts_at, created_by)
+  values (now() + interval '1 day', '33333333-3333-3333-3333-333333333333');
+  raise notice 'FAIL: a parent created their own meeting slot';
+exception when others then
+  raise notice 'PASS: non-coach cannot create meeting slots (%)', sqlerrm;
+end $$;
+
+-- The parent books on behalf of their own athlete.
+do $$
+begin
+  perform book_meeting_slot('77777777-7777-7777-7777-777777777777',
+                            '22222222-2222-2222-2222-222222222222',
+                            'Summer goals');
+  raise notice 'PASS: parent booked a slot for their athlete';
+exception when others then
+  raise notice 'FAIL: parent could not book (%)', sqlerrm;
+end $$;
+
+do $$
+begin
+  perform book_meeting_slot('77777777-7777-7777-7777-777777777777',
+                            '22222222-2222-2222-2222-222222222222');
+  raise notice 'FAIL: a taken slot was booked twice';
+exception when others then
+  raise notice 'PASS: double booking rejected (%)', sqlerrm;
+end $$;
+
+do $$
+begin
+  perform book_meeting_slot('99999999-9999-9999-9999-999999999999',
+                            '22222222-2222-2222-2222-222222222222');
+  raise notice 'FAIL: a past slot was booked';
+exception when others then
+  raise notice 'PASS: past slot rejected (%)', sqlerrm;
+end $$;
+
+-- Booking for someone else's child is the attack that matters here.
+select set_config('request.jwt.claim.sub', :newparent, false);
+do $$
+begin
+  perform book_meeting_slot('88888888-8888-8888-8888-888888888888',
+                            '22222222-2222-2222-2222-222222222222');
+  raise notice 'FAIL: a stranger booked a meeting for another athlete';
+exception when others then
+  raise notice 'PASS: cannot book for an athlete you are not linked to (%)', sqlerrm;
+end $$;
+
+-- Another family sees the open time but not who took the booked one.
+do $$
+declare n_open int; n_taken int;
+begin
+  select count(*) into n_open from meeting_slots
+   where id = '88888888-8888-8888-8888-888888888888';
+  select count(*) into n_taken from meeting_slots
+   where id = '77777777-7777-7777-7777-777777777777';
+  if n_open = 1 and n_taken = 0
+  then raise notice 'PASS: open slots are visible, other families'' bookings are not';
+  else raise notice 'FAIL: slot visibility wrong (open %, taken %)', n_open, n_taken;
+  end if;
+end $$;
+
+-- Cancelling releases the time instead of destroying it.
+select set_config('request.jwt.claim.sub', :parent, false);
+do $$
+begin
+  perform cancel_meeting_booking('77777777-7777-7777-7777-777777777777');
+  if exists (select 1 from meeting_slots
+              where id = '77777777-7777-7777-7777-777777777777' and booked_for is null)
+  then raise notice 'PASS: cancelling returns the slot to the open pool';
+  else raise notice 'FAIL: slot was not released';
+  end if;
+exception when others then
+  raise notice 'FAIL: guardian could not cancel (%)', sqlerrm;
+end $$;
+
+-- ---------------------------------------------------------------------------
+-- Photos (0006). Pictures of minors: staff post, the clinic looks.
+-- ---------------------------------------------------------------------------
+
+select set_config('request.jwt.claim.sub', :athlete, false);
+do $$
+begin
+  insert into photos (storage_path, uploaded_by)
+  values ('2026/sneaky.jpg', '22222222-2222-2222-2222-222222222222');
+  raise notice 'FAIL: an athlete posted a photo';
+exception when others then
+  raise notice 'PASS: athletes cannot post photos (%)', sqlerrm;
+end $$;
+
+select set_config('request.jwt.claim.sub', :coach, false);
+insert into photos (storage_path, caption, uploaded_by) values ('2026/team.jpg', 'Week one', :coach);
+
+select set_config('request.jwt.claim.sub', :athlete, false);
+do $$
+declare n int;
+begin
+  select count(*) into n from photos where storage_path = '2026/team.jpg';
+  if n = 1 then raise notice 'PASS: clinic members can see posted photos';
+  else raise notice 'FAIL: athlete cannot see clinic photos';
+  end if;
+end $$;
+
+reset role;
