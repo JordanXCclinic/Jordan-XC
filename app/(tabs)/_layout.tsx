@@ -1,9 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Redirect, Tabs } from 'expo-router';
-import { ActivityIndicator, StyleSheet, View, type ColorValue } from 'react-native';
+import { Platform, StyleSheet, type ColorValue } from 'react-native';
+import { FullScreenLoader } from '../../components/Screen';
 import { useAuth } from '../../lib/auth';
-import { isCoach } from '../../lib/types';
-import { colors } from '../../lib/theme';
+import { isAthlete, isCoach } from '../../lib/types';
+import { colors, shadow, spacing, type } from '../../lib/theme';
 
 const icon =
   (name: keyof typeof Ionicons.glyphMap) =>
@@ -14,37 +15,53 @@ const icon =
 // This layout owns the auth gate. A separate index route would collide with
 // (tabs)/index at "/" and swallow every other tab.
 export default function TabsLayout() {
-  const { session, profile, role, loading, profileLoaded } = useAuth();
+  const { session, profile, role, loading, profileLoaded, onboarded } = useAuth();
 
-  if (loading || (session && !profileLoaded)) {
-    return (
-      <View style={styles.center}>
-        <ActivityIndicator color={colors.primary} />
-      </View>
-    );
-  }
+  if (loading || (session && !profileLoaded)) return <FullScreenLoader />;
 
   if (!session) return <Redirect href="/sign-in" />;
   if (!profile) return <Redirect href="/onboarding" />;
+  if (!onboarded) return <Redirect href="/profile-setup" />;
+
+  const staff = isCoach(role);
 
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
         tabBarActiveTintColor: colors.primary,
-        tabBarInactiveTintColor: colors.textMuted,
+        tabBarInactiveTintColor: colors.textFaint,
+        tabBarStyle: styles.bar,
+        tabBarLabelStyle: styles.label,
+        tabBarItemStyle: styles.item,
       }}
     >
       <Tabs.Screen name="index" options={{ title: 'Home', tabBarIcon: icon('home') }} />
       <Tabs.Screen name="schedule" options={{ title: 'Schedule', tabBarIcon: icon('calendar') }} />
-      <Tabs.Screen name="training" options={{ title: 'Training', tabBarIcon: icon('walk') }} />
+      <Tabs.Screen
+        name="training"
+        options={{
+          title: 'Training',
+          tabBarIcon: icon('fitness'),
+          // Staff plan training from the Coach tab; they have no plan of their own.
+          href: staff ? null : undefined,
+        }}
+      />
       <Tabs.Screen name="learn" options={{ title: 'Learn', tabBarIcon: icon('book') }} />
       <Tabs.Screen
         name="coach"
         options={{
           title: 'Coach',
           tabBarIcon: icon('clipboard'),
-          href: isCoach(role) ? undefined : null,
+          // Hiding the tab is convenience, not authorization — RLS is.
+          href: staff ? undefined : null,
+        }}
+      />
+      <Tabs.Screen
+        name="profile"
+        options={{
+          title: isAthlete(role) ? 'Me' : 'Profile',
+          tabBarIcon: icon('person-circle'),
         }}
       />
     </Tabs>
@@ -52,5 +69,15 @@ export default function TabsLayout() {
 }
 
 const styles = StyleSheet.create({
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.background },
+  bar: {
+    backgroundColor: colors.background,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.border,
+    height: Platform.OS === 'ios' ? 88 : 64,
+    paddingTop: spacing.sm,
+    paddingBottom: Platform.OS === 'ios' ? spacing.xl : spacing.sm,
+    ...shadow.card,
+  },
+  label: { ...type.caption, fontSize: 11, fontWeight: '600' },
+  item: { paddingVertical: 2 },
 });

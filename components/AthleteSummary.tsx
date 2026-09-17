@@ -1,0 +1,179 @@
+import { useCallback, useEffect, useState } from 'react';
+import { Ionicons } from '@expo/vector-icons';
+import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Card } from './Card';
+import { EmptyState, LoadingState } from './Screen';
+import { formatDuration } from '../lib/format';
+import { isSupabaseConfigured, supabase } from '../lib/supabase';
+import {
+  ATHLETE_PROFILE_COLUMNS,
+  PERSONAL_BEST_COLUMNS,
+  PB_EVENTS,
+  type AthleteProfile,
+  type PersonalBest,
+} from '../lib/types';
+import { colors, radius, spacing, type } from '../lib/theme';
+
+/**
+ * Read-only view of an athlete's intake form. Shared by the Profile tab and the
+ * coach's roster so the coach is never looking at a staler layout than the
+ * family is.
+ */
+export function AthleteSummary({ athleteId }: { athleteId: string }) {
+  const [profile, setProfile] = useState<AthleteProfile | null>(null);
+  const [bests, setBests] = useState<PersonalBest[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const load = useCallback(async () => {
+    if (!isSupabaseConfigured) {
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    const [{ data: row }, { data: pbRows }] = await Promise.all([
+      supabase
+        .from('athlete_profiles')
+        .select(ATHLETE_PROFILE_COLUMNS)
+        .eq('athlete_id', athleteId)
+        .maybeSingle(),
+      supabase.from('personal_bests').select(PERSONAL_BEST_COLUMNS).eq('athlete_id', athleteId),
+    ]);
+    setProfile((row as AthleteProfile | null) ?? null);
+    setBests((pbRows as PersonalBest[] | null) ?? []);
+    setLoading(false);
+  }, [athleteId]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  if (loading) return <LoadingState />;
+
+  if (!profile && bests.length === 0) {
+    return (
+      <EmptyState
+        icon="clipboard-outline"
+        message="This profile has not been filled in yet."
+      />
+    );
+  }
+
+  // Keep the events in race order rather than whatever order they came back in.
+  const ordered = [...bests].sort(
+    (a, b) => PB_EVENTS.indexOf(a.event as never) - PB_EVENTS.indexOf(b.event as never)
+  );
+
+  return (
+    <>
+      {profile?.school || profile?.grade ? (
+        <Card>
+          <Text style={styles.cardTitle}>School</Text>
+          <View style={styles.facts}>
+            {profile.school ? <Fact label="School" value={profile.school} /> : null}
+            {profile.grade ? <Fact label="Grade" value={profile.grade} /> : null}
+          </View>
+        </Card>
+      ) : null}
+
+      {ordered.length > 0 ? (
+        <Card>
+          <Text style={styles.cardTitle}>Personal bests</Text>
+          <View style={styles.pbGrid}>
+            {ordered.map((best) => (
+              <View key={best.id} style={styles.pb}>
+                <Text style={styles.pbEvent}>{best.event}</Text>
+                <Text style={styles.pbTime}>{formatDuration(best.result_seconds)}</Text>
+              </View>
+            ))}
+          </View>
+        </Card>
+      ) : null}
+
+      {profile?.goals ? (
+        <Card>
+          <Text style={styles.cardTitle}>Goals</Text>
+          <Text style={styles.body}>{profile.goals}</Text>
+        </Card>
+      ) : null}
+
+      {profile?.injury_history || profile?.medical_notes ? (
+        <Card accent="danger">
+          <View style={styles.privateHead}>
+            <Ionicons name="lock-closed" size={15} color={colors.danger} />
+            <Text style={styles.cardTitle}>Health</Text>
+          </View>
+          {profile.injury_history ? (
+            <View style={styles.block}>
+              <Text style={styles.blockLabel}>Injuries</Text>
+              <Text style={styles.body}>{profile.injury_history}</Text>
+            </View>
+          ) : null}
+          {profile.medical_notes ? (
+            <View style={styles.block}>
+              <Text style={styles.blockLabel}>Medical</Text>
+              <Text style={styles.body}>{profile.medical_notes}</Text>
+            </View>
+          ) : null}
+        </Card>
+      ) : null}
+
+      {profile?.emergency_contact_name ? (
+        <Card accent="primary">
+          <Text style={styles.cardTitle}>Emergency contact</Text>
+          <Text style={styles.contactName}>{profile.emergency_contact_name}</Text>
+          {profile.emergency_contact_relationship ? (
+            <Text style={styles.contactMeta}>{profile.emergency_contact_relationship}</Text>
+          ) : null}
+          {profile.emergency_contact_phone ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`Call ${profile.emergency_contact_name}`}
+              onPress={() => void Linking.openURL(`tel:${profile.emergency_contact_phone}`)}
+              style={({ pressed }) => [styles.call, pressed && styles.pressed]}
+            >
+              <Ionicons name="call" size={16} color={colors.primary} />
+              <Text style={styles.callText}>{profile.emergency_contact_phone}</Text>
+            </Pressable>
+          ) : null}
+        </Card>
+      ) : null}
+    </>
+  );
+}
+
+function Fact({ label, value }: { label: string; value: string }) {
+  return (
+    <View style={styles.fact}>
+      <Text style={styles.factLabel}>{label}</Text>
+      <Text style={styles.factValue}>{value}</Text>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  cardTitle: { ...type.heading, color: colors.text },
+  body: { ...type.body, color: colors.textMuted },
+  facts: { gap: spacing.md, marginTop: spacing.md },
+  fact: { gap: 2 },
+  factLabel: { ...type.caption, color: colors.textFaint },
+  factValue: { ...type.body, color: colors.text },
+  pbGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginTop: spacing.md },
+  pb: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    minWidth: 92,
+    gap: 2,
+  },
+  pbEvent: { ...type.caption, color: colors.textFaint },
+  pbTime: { ...type.heading, color: colors.primary },
+  privateHead: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  block: { marginTop: spacing.md, gap: 2 },
+  blockLabel: { ...type.caption, color: colors.textFaint },
+  contactName: { ...type.bodyStrong, color: colors.text, marginTop: spacing.sm },
+  contactMeta: { ...type.caption, color: colors.textMuted },
+  call: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.md },
+  pressed: { opacity: 0.7 },
+  callText: { ...type.bodyStrong, color: colors.primary },
+});

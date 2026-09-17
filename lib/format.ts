@@ -118,3 +118,32 @@ export const roleLabel = (role: string): string =>
     private_client: 'One-on-one',
     parent: 'Parent',
   })[role] ?? role;
+
+/**
+ * Reads a race time the way a runner writes it: "18:23", "1:02:33", or a bare
+ * number of seconds. Returns null on anything it cannot make sense of, so the
+ * caller can leave the field alone rather than storing a wrong time.
+ */
+export function parseDuration(text: string): number | null {
+  const trimmed = text.trim();
+  if (!trimmed) return null;
+
+  const parts = trimmed.split(':');
+  if (parts.some((part) => !/^\d{1,2}$/.test(part.trim()))) return null;
+
+  const numbers = parts.map((part) => Number(part));
+  if (numbers.length === 1) return numbers[0]! > 0 ? numbers[0]! : null;
+  if (numbers.length === 2) {
+    const [minutes, seconds] = numbers as [number, number];
+    if (seconds > 59) return null;
+    const total = minutes * 60 + seconds;
+    return total > 0 ? total : null;
+  }
+  if (numbers.length === 3) {
+    const [hours, minutes, seconds] = numbers as [number, number, number];
+    if (minutes > 59 || seconds > 59) return null;
+    const total = hours * 3600 + minutes * 60 + seconds;
+    return total > 0 ? total : null;
+  }
+  return null;
+}

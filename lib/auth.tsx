@@ -1,9 +1,15 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { isSupabaseConfigured, supabase } from './supabase';
-import type { AppRole, Profile } from './types';
-
-const PROFILE_COLUMNS = 'id, full_name, role, date_of_birth, phone, graduation_year';
+import { PROFILE_COLUMNS, type AppRole, type Profile } from './types';
 
 type AuthState = {
   session: Session | null;
@@ -12,6 +18,8 @@ type AuthState = {
   loading: boolean;
   /** False until the profile lookup for the current session has resolved. */
   profileLoaded: boolean;
+  /** True once the intake form has been submitted at least once. */
+  onboarded: boolean;
   refreshProfile: () => Promise<void>;
   signOut: () => Promise<void>;
 };
@@ -45,12 +53,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const userId = session?.user?.id;
 
   const loadProfile = useCallback(async () => {
-    if (!userId) {
+    if (!userId || !isSupabaseConfigured) {
       setProfile(null);
       setProfileLoaded(true);
       return;
     }
-    const { data } = await supabase.from('profiles').select(PROFILE_COLUMNS).eq('id', userId).maybeSingle();
+    const { data } = await supabase
+      .from('profiles')
+      .select(PROFILE_COLUMNS)
+      .eq('id', userId)
+      .maybeSingle();
     setProfile((data as Profile | null) ?? null);
     setProfileLoaded(true);
   }, [userId]);
@@ -67,9 +79,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       role: profile?.role,
       loading,
       profileLoaded,
+      onboarded: Boolean(profile?.onboarded_at),
       refreshProfile: loadProfile,
       signOut: async () => {
         await supabase.auth.signOut();
+        setProfile(null);
       },
     }),
     [session, profile, loading, profileLoaded, loadProfile]

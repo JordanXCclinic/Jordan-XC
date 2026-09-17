@@ -1,50 +1,128 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Ionicons } from '@expo/vector-icons';
 import { StyleSheet, Text, View } from 'react-native';
-import { EmptyState, Screen } from '../../components/Screen';
+import { Badge, type Tone } from '../../components/Badge';
+import { Card } from '../../components/Card';
+import { EmptyState, LoadingState, Screen } from '../../components/Screen';
+import { SegmentedControl } from '../../components/SegmentedControl';
+import { formatDayHeading, formatTime } from '../../lib/format';
 import { isSupabaseConfigured, supabase } from '../../lib/supabase';
-import { colors, radius, spacing } from '../../lib/theme';
-import type { Practice } from '../../lib/types';
+import { PRACTICE_COLUMNS, type Practice } from '../../lib/types';
+import { colors, spacing, type } from '../../lib/theme';
 
-function formatWhen(iso: string): string {
-  return new Date(iso).toLocaleString(undefined, {
-    weekday: 'short',
-    month: 'short',
-    day: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-  });
-}
+type Range = 'upcoming' | 'past';
+
+const STATUS: Record<Practice['status'], { label: string; tone: Tone } | null> = {
+  scheduled: null,
+  moved: { label: 'Changed', tone: 'warning' },
+  cancelled: { label: 'Cancelled', tone: 'danger' },
+};
 
 export default function Schedule() {
+  const [range, setRange] = useState<Range>('upcoming');
   const [practices, setPractices] = useState<Practice[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const load = useCallback(async () => {
+    if (!isSupabaseConfigured) {
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+
+    const now = new Date().toISOString();
+    const query = supabase.from('practices').select(PRACTICE_COLUMNS).limit(60);
+
+    const { data } =
+      range === 'upcoming'
+        ? await query.gte('starts_at', now).order('starts_at', { ascending: true })
+        : await query.lt('starts_at', now).order('starts_at', { ascending: false });
+
+    setPractices((data as Practice[] | null) ?? []);
+    setLoading(false);
+  }, [range]);
 
   useEffect(() => {
-    if (!isSupabaseConfigured) return;
-    supabase
-      .from('practices')
-      .select('id, starts_at, ends_at, location_name, meeting_point, notes, status, audience')
-      .gte('starts_at', new Date().toISOString())
-      .order('starts_at', { ascending: true })
-      .limit(30)
-      .then(({ data }) => setPractices((data as Practice[]) ?? []));
-  }, []);
+    void load();
+  }, [load]);
+
+  // Practices read as a diary, so they are grouped under one heading per day
+  // rather than repeating the date on every card.
+  const days = useMemo(() => {
+    const groups = new Map<string, Practice[]>();
+    for (const practice of practices) {
+      const key = formatDayHeading(practice.starts_at);
+      const bucket = groups.get(key);
+      if (bucket) bucket.push(practice);
+      else groups.set(key, [practice]);
+    }
+    return [...groups.entries()];
+  }, [practices]);
 
   return (
-    <Screen title="Schedule" subtitle="Upcoming practices and meets">
-      {practices.length === 0 ? (
-        <EmptyState message="Nothing on the schedule yet. Practices added by a coach will appear here." />
+    <Screen title="Schedule" subtitle="Practices, meets, and clinic sessions" onRefresh={load}>
+      <SegmentedControl
+        options={[
+          { value: 'upcoming', label: 'Upcoming' },
+          { value: 'past', label: 'Past' },
+        ]}
+        value={range}
+        onChange={setRange}
+      />
+
+      {loading ? (
+        <LoadingState />
+      ) : days.length === 0 ? (
+        <EmptyState
+          icon="calendar-outline"
+          message={
+            range === 'upcoming'
+              ? 'Nothing scheduled yet. Practices added by a coach appear here right away.'
+              : 'No past practices to show.'
+          }
+        />
       ) : (
-        practices.map((practice) => (
-          <View key={practice.id} style={styles.card}>
-            <Text style={styles.when}>{formatWhen(practice.starts_at)}</Text>
-            <Text style={styles.location}>{practice.location_name}</Text>
-            {practice.meeting_point ? (
-              <Text style={styles.detail}>Meet at {practice.meeting_point}</Text>
-            ) : null}
-            {practice.notes ? <Text style={styles.detail}>{practice.notes}</Text> : null}
-            {practice.status !== 'scheduled' ? (
-              <Text style={styles.status}>{practice.status.toUpperCase()}</Text>
-            ) : null}
+        days.map(([day, items]) => (
+          <View key={day} style={styles.group}>
+            <Text style={styles.day}>{day}</Text>
+            {items.map((practice) => {
+              const status = STATUS[practice.status];
+              return (
+                <Card
+                  key={practice.id}
+                  accent={practice.status === 'cancelled' ? 'danger' : undefined}
+                >
+                  <View style={styles.head}>
+                    <Text
+                      style={[
+                        styles.time,
+                        practice.status === 'cancelled' && styles.struck,
+                      ]}
+                    >
+                      {formatTime(practice.starts_at)}
+                      {practice.ends_at ? ` – ${formatTime(practice.ends_at)}` : ''}
+                    </Text>
+                    {status ? <Badge label={status.label} tone={status.tone} /> : null}
+                  </View>
+
+                  <Text style={styles.location}>{practice.location_name}</Text>
+
+                  {practice.meeting_point ? (
+                    <View style={styles.detailRow}>
+                      <Ionicons name="navigate-outline" size={15} color={colors.textFaint} />
+                      <Text style={styles.detail}>Meet at {practice.meeting_point}</Text>
+                    </View>
+                  ) : null}
+
+                  {practice.notes ? (
+                    <View style={styles.detailRow}>
+                      <Ionicons name="information-circle-outline" size={15} color={colors.textFaint} />
+                      <Text style={styles.detail}>{practice.notes}</Text>
+                    </View>
+                  ) : null}
+                </Card>
+              );
+            })}
           </View>
         ))
       )}
@@ -53,15 +131,12 @@ export default function Schedule() {
 }
 
 const styles = StyleSheet.create({
-  card: {
-    backgroundColor: colors.surface,
-    borderRadius: radius.md,
-    padding: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  when: { fontSize: 14, fontWeight: '600', color: colors.primary },
-  location: { fontSize: 17, fontWeight: '600', color: colors.text, marginTop: spacing.xs },
-  detail: { fontSize: 15, color: colors.textMuted, marginTop: spacing.xs },
-  status: { fontSize: 13, fontWeight: '700', color: colors.danger, marginTop: spacing.sm },
+  group: { gap: spacing.md, marginTop: spacing.sm },
+  day: { ...type.overline, color: colors.textFaint },
+  head: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.md },
+  time: { ...type.heading, color: colors.primary },
+  struck: { textDecorationLine: 'line-through', color: colors.textFaint },
+  location: { ...type.bodyStrong, color: colors.text, marginTop: spacing.xs },
+  detailRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm, alignItems: 'flex-start' },
+  detail: { ...type.body, color: colors.textMuted, flex: 1 },
 });

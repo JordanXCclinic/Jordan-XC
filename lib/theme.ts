@@ -99,3 +99,15 @@ export const shadow = {
 
 /** Tap targets never get smaller than this, per both platforms' guidelines. */
 export const HIT_SLOP = { top: 8, bottom: 8, left: 8, right: 8 };
+
+/**
+ * Shared look for pushed (stack) screens: navy bar, white title, no hairline.
+ * Tab screens draw their own large titles instead.
+ */
+export const stackHeader = {
+  headerStyle: { backgroundColor: colors.primary },
+  headerTintColor: colors.textInverse,
+  headerTitleStyle: { fontSize: 17, fontWeight: '700' as const, color: colors.textInverse },
+  headerShadowVisible: false,
+  headerBackTitle: 'Back',
+};

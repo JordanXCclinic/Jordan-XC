@@ -1,11 +1,26 @@
 import { useState } from 'react';
 import { router } from 'expo-router';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import * as WebBrowser from 'expo-web-browser';
+import { Ionicons } from '@expo/vector-icons';
+import {
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Button } from '../components/Button';
 import { useAuth } from '../lib/auth';
 import { supabase } from '../lib/supabase';
-import { colors, radius, spacing } from '../lib/theme';
+import { colors, radius, shadow, spacing, type } from '../lib/theme';
+import { CLINIC_URL } from './sign-in';
 
 export default function Onboarding() {
+  const insets = useSafeAreaInsets();
   const { refreshProfile, signOut } = useAuth();
   const [code, setCode] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -25,80 +40,127 @@ export default function Onboarding() {
 
     await refreshProfile();
     setBusy(false);
-    router.replace('/(tabs)');
+    // Redemption creates the profile; the intake form comes next.
+    router.replace('/profile-setup');
   }
 
   return (
-    <View style={styles.root}>
-      <View style={styles.card}>
-        <Text style={styles.title}>Enter your clinic code</Text>
-        <Text style={styles.subtitle}>
-          This came with your registration confirmation. Athletes and parents each
-          get their own code.
-        </Text>
+    <KeyboardAvoidingView
+      style={styles.root}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
+      <ScrollView
+        contentContainerStyle={[
+          styles.content,
+          { paddingTop: insets.top + spacing.xxl, paddingBottom: insets.bottom + spacing.xl },
+        ]}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.card}>
+          <View style={styles.badge}>
+            <Ionicons name="key" size={22} color={colors.primary} />
+          </View>
 
-        <TextInput
-          style={styles.input}
-          placeholder="ABCD1234"
-          placeholderTextColor={colors.textMuted}
-          autoCapitalize="characters"
-          autoCorrect={false}
-          value={code}
-          onChangeText={setCode}
-          maxLength={16}
-        />
+          <Text style={styles.title}>Enter your clinic code</Text>
+          <Text style={styles.subtitle}>
+            It came with your registration confirmation. Athletes and parents each get
+            their own code, and either one can be used first.
+          </Text>
 
-        {error ? <Text style={styles.error}>{error}</Text> : null}
+          <TextInput
+            style={[styles.input, Boolean(error) && styles.inputError]}
+            placeholder="ABCDEFGHJK"
+            placeholderTextColor={colors.textFaint}
+            autoCapitalize="characters"
+            autoCorrect={false}
+            autoComplete="off"
+            value={code}
+            onChangeText={(next) => {
+              // The alphabet has no I, O, 0 or 1, so anything typed is upper case.
+              setCode(next.toUpperCase().replace(/\s/g, ''));
+              if (error) setError(null);
+            }}
+            maxLength={16}
+            accessibilityLabel="Clinic code"
+            returnKeyType="go"
+            onSubmitEditing={() => {
+              if (code.trim() && !busy) void onSubmit();
+            }}
+          />
 
-        <Pressable
-          style={[styles.button, (busy || !code.trim()) && styles.buttonDisabled]}
-          onPress={onSubmit}
-          disabled={busy || !code.trim()}
-        >
-          <Text style={styles.buttonText}>{busy ? 'Checking…' : 'Continue'}</Text>
+          {error ? (
+            <View style={styles.error}>
+              <Ionicons name="alert-circle" size={18} color={colors.danger} />
+              <Text style={styles.errorText}>{error}</Text>
+            </View>
+          ) : null}
+
+          <Button
+            label="Unlock the app"
+            size="lg"
+            full
+            loading={busy}
+            disabled={!code.trim()}
+            onPress={onSubmit}
+          />
+
+          <Pressable
+            accessibilityRole="link"
+            onPress={() => void WebBrowser.openBrowserAsync(CLINIC_URL)}
+            style={styles.linkRow}
+          >
+            <Text style={styles.link}>No code yet? Register at jordanxcclinic.com</Text>
+            <Ionicons name="open-outline" size={15} color={colors.primary} />
+          </Pressable>
+        </View>
+
+        <Pressable accessibilityRole="button" onPress={signOut} style={styles.signOut}>
+          <Text style={styles.signOutText}>Use a different account</Text>
         </Pressable>
-
-        <Text style={styles.help}>
-          Lost your code? Contact the clinic and we will send a new one.
-        </Text>
-
-        <Pressable onPress={signOut}>
-          <Text style={styles.signOut}>Use a different account</Text>
-        </Pressable>
-      </View>
-    </View>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.primary, justifyContent: 'center', padding: spacing.lg },
+  root: { flex: 1, backgroundColor: colors.primary },
+  content: { flexGrow: 1, justifyContent: 'center', paddingHorizontal: spacing.lg, gap: spacing.xl },
   card: {
     backgroundColor: colors.background,
-    borderRadius: radius.lg,
-    padding: spacing.lg,
-    gap: spacing.md,
+    borderRadius: radius.xl,
+    padding: spacing.xl,
+    gap: spacing.lg,
+    ...shadow.raised,
   },
-  title: { fontSize: 24, fontWeight: '700', color: colors.text },
-  subtitle: { fontSize: 15, color: colors.textMuted, lineHeight: 21 },
+  badge: {
+    width: 48,
+    height: 48,
+    borderRadius: radius.pill,
+    backgroundColor: colors.primaryTint,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  title: { ...type.title, color: colors.text },
+  subtitle: { ...type.body, color: colors.textMuted },
   input: {
-    borderWidth: 1,
+    borderWidth: 2,
     borderColor: colors.border,
-    borderRadius: radius.sm,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.md,
-    fontSize: 20,
-    letterSpacing: 2,
+    backgroundColor: colors.surface,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.lg,
+    fontSize: 22,
+    fontWeight: '700',
+    letterSpacing: 4,
+    textAlign: 'center',
     color: colors.text,
   },
-  button: {
-    backgroundColor: colors.primary,
-    borderRadius: radius.sm,
-    paddingVertical: spacing.md,
-    alignItems: 'center',
-  },
-  buttonDisabled: { opacity: 0.6 },
-  buttonText: { color: '#FFFFFF', fontSize: 16, fontWeight: '600' },
-  error: { color: colors.danger, fontSize: 14, lineHeight: 20 },
-  help: { fontSize: 13, color: colors.textMuted, lineHeight: 19 },
-  signOut: { fontSize: 14, color: colors.textMuted, textDecorationLine: 'underline' },
+  inputError: { borderColor: colors.danger },
+  error: { flexDirection: 'row', gap: spacing.sm, alignItems: 'flex-start' },
+  errorText: { ...type.caption, color: colors.danger, flex: 1, lineHeight: 18 },
+  linkRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.xs },
+  link: { ...type.caption, color: colors.primary, fontWeight: '600' },
+  signOut: { alignSelf: 'center' },
+  signOutText: { ...type.caption, color: colors.textOnPrimary, textDecorationLine: 'underline' },
 });
