@@ -13,6 +13,7 @@ export default function CoachLayout() {
       <Stack.Screen name="meetings" options={{ title: 'Meetings' }} />
       <Stack.Screen name="plans/index" options={{ title: 'Training plans' }} />
       <Stack.Screen name="plans/[id]" options={{ title: 'Plan' }} />
+      <Stack.Screen name="attendance/[id]" options={{ title: 'Attendance' }} />
       <Stack.Screen name="roster/index" options={{ title: 'Roster' }} />
       <Stack.Screen name="roster/[id]" options={{ title: '' }} />
     </Stack>

@@ -152,6 +152,44 @@ exception when others then
   raise notice 'PASS: non-coach cannot generate codes (%)', sqlerrm;
 end $$;
 
+-- Assistants run practices and write training, but only the head coach hands
+-- out access to the clinic.
+reset role;
+insert into auth.users (id) values ('eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee');
+insert into profiles (id, full_name, role)
+values ('eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee', 'Brody Ahlemeyer', 'coach');
+
+set role authenticated;
+select set_config('request.jwt.claim.sub', 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee', false);
+do $$
+begin
+  perform create_family_codes('Someone New', '2026');
+  raise notice 'FAIL: an assistant coach issued a clinic code';
+exception when others then
+  raise notice 'PASS: an assistant coach cannot issue clinic codes (%)', sqlerrm;
+end $$;
+
+do $$
+declare n int;
+begin
+  select count(*) into n from invite_codes;
+  if n = 0 then raise notice 'PASS: an assistant coach cannot read the code table';
+  else raise notice 'FAIL: an assistant read % invite codes', n;
+  end if;
+end $$;
+
+-- They still have every other staff power.
+do $$
+begin
+  insert into practices (starts_at, location_name, created_by)
+  values (now() + interval '9 days', 'Veterans Park', 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee');
+  raise notice 'PASS: an assistant coach can still post a practice';
+exception when others then
+  raise notice 'FAIL: an assistant coach could not post a practice (%)', sqlerrm;
+end $$;
+
+select set_config('request.jwt.claim.sub', :coach, false);
+
 -- The generated pair must work end to end.
 do $$
 declare a text; p text;
@@ -650,6 +688,12 @@ begin
        n_profile, n_intake, n_pb, n_link, n_user;
   end if;
 end $$;
+
+-- The assistant added earlier has served his purpose. Retiring him here keeps
+-- the reassignment test below about one departing coach and one heir, rather
+-- than about which of several staff happens to be oldest.
+delete from practices where created_by = 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee';
+delete from auth.users where id = 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee';
 
 -- The clinic's own records outlive a coach, and are handed to another coach
 -- rather than blocking the deletion or vanishing with them.

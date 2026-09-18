@@ -8,7 +8,8 @@ import { Card } from '../../../components/Card';
 import { SwitchRow, TextField } from '../../../components/Field';
 import { EmptyState, LoadingState, Screen, SectionHeader } from '../../../components/Screen';
 import { isSupabaseConfigured, supabase } from '../../../lib/supabase';
-import { INVITE_CODE_COLUMNS, type InviteCode } from '../../../lib/types';
+import { useAuth } from '../../../lib/auth';
+import { INVITE_CODE_COLUMNS, isHeadCoach, type InviteCode } from '../../../lib/types';
 import { roleLabel } from '../../../lib/format';
 import { colors, radius, spacing, type } from '../../../lib/theme';
 
@@ -17,6 +18,7 @@ const SEASON = String(new Date().getFullYear());
 type Issued = { athlete_code: string; parent_code: string; name: string };
 
 export default function Codes() {
+  const { role } = useAuth();
   const [name, setName] = useState('');
   const [oneOnOne, setOneOnOne] = useState(false);
   const [issued, setIssued] = useState<Issued | null>(null);
@@ -77,6 +79,19 @@ export default function Codes() {
   }
 
   const outstanding = codes.filter((code) => !code.redeemed_at);
+
+  // Assistants can run every practice and write every plan, but letting a new
+  // family into the clinic stays with the head coach. RLS enforces it too.
+  if (!isHeadCoach(role)) {
+    return (
+      <Screen inStack title="Clinic codes">
+        <EmptyState
+          icon="lock-closed-outline"
+          message="Only the head coach issues clinic codes. Ask Coach Will for one and he can send it straight to the family."
+        />
+      </Screen>
+    );
+  }
 
   return (
     <Screen

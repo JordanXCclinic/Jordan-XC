@@ -171,6 +171,12 @@ export const WORKOUT_LOG_COLUMNS =
 export const isCoach = (role: AppRole | undefined): boolean =>
   role === 'admin' || role === 'coach';
 
+/**
+ * The head coach. Assistants run practices and write training like anyone on
+ * staff; issuing the codes that let a family into the clinic is not shared.
+ */
+export const isHeadCoach = (role: AppRole | undefined): boolean => role === 'admin';
+
 /** Roles that have training of their own, as opposed to watching someone else's. */
 export const isAthlete = (role: AppRole | undefined): boolean =>
   role === 'athlete' || role === 'private_client';

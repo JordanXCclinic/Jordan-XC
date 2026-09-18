@@ -44,6 +44,8 @@ export default function PlanEditor() {
 
   const [week, setWeek] = useState(1);
   const [day, setDay] = useState('1');
+  /** Set while correcting an existing session rather than writing a new one. */
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [title, setTitle] = useState('');
   const [distance, setDistance] = useState('');
   const [intensity, setIntensity] = useState('');
@@ -101,6 +103,27 @@ export default function PlanEditor() {
     [workouts, week]
   );
 
+  function resetForm() {
+    setEditingId(null);
+    setTitle('');
+    setDistance('');
+    setIntensity('');
+    setDescription('');
+    setError(null);
+  }
+
+  /** Pulls a session back into the form, so fixing a typo is not a retype. */
+  function startEditing(workout: Workout) {
+    setEditingId(workout.id);
+    setWeek(workout.week_number);
+    setDay(String(workout.day_of_week));
+    setTitle(workout.title);
+    setDistance(workout.distance_miles === null ? '' : String(workout.distance_miles));
+    setIntensity(workout.intensity ?? '');
+    setDescription(workout.description ?? '');
+    setError(null);
+  }
+
   async function addWorkout() {
     if (!id) return;
     if (!title.trim()) {
@@ -138,10 +161,7 @@ export default function PlanEditor() {
       return;
     }
 
-    setTitle('');
-    setDistance('');
-    setIntensity('');
-    setDescription('');
+    resetForm();
     await load();
   }
 
@@ -209,7 +229,9 @@ export default function PlanEditor() {
       </ScrollView>
 
       <Card accent="primary">
-        <Text style={styles.cardTitle}>Add a workout to week {week}</Text>
+        <Text style={styles.cardTitle}>
+          {editingId ? `Edit ${planDayLabel(Number(day))}, week ${week}` : `Add a workout to week ${week}`}
+        </Text>
         <View style={styles.fields}>
           <ChipSelect label="Day" options={DAY_OPTIONS} value={day} onChange={setDay} />
           <TextField
@@ -249,7 +271,16 @@ export default function PlanEditor() {
 
         {error ? <Text style={styles.error}>{error}</Text> : null}
 
-        <Button label="Add workout" full loading={saving} onPress={addWorkout} style={styles.submit} />
+        <Button
+          label={editingId ? 'Save changes' : 'Add workout'}
+          full
+          loading={saving}
+          onPress={addWorkout}
+          style={styles.submit}
+        />
+        {editingId ? (
+          <Button label="Cancel" variant="ghost" full onPress={resetForm} style={styles.cancel} />
+        ) : null}
       </Card>
 
       <SectionHeader title={`Week ${week}`} />
@@ -258,17 +289,20 @@ export default function PlanEditor() {
         <EmptyState icon="create-outline" message="Nothing written for this week yet." />
       ) : (
         shown.map((workout) => (
-          <Card key={workout.id}>
+          <Card key={workout.id} onPress={() => startEditing(workout)}>
             <View style={styles.head}>
               <Text style={styles.day}>{planDayLabel(workout.day_of_week)}</Text>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={`Delete ${workout.title}`}
-                onPress={() => void removeWorkout(workout)}
-                hitSlop={8}
-              >
-                <Ionicons name="trash-outline" size={17} color={colors.danger} />
-              </Pressable>
+              <View style={styles.cardActions}>
+                <Ionicons name="create-outline" size={16} color={colors.textFaint} />
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={`Delete ${workout.title}`}
+                  onPress={() => void removeWorkout(workout)}
+                  hitSlop={8}
+                >
+                  <Ionicons name="trash-outline" size={17} color={colors.danger} />
+                </Pressable>
+              </View>
             </View>
             <Text style={styles.workoutTitle}>{workout.title}</Text>
             <View style={styles.metaRow}>
@@ -336,6 +370,8 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', gap: spacing.md },
   half: { flex: 1 },
   submit: { marginTop: spacing.lg },
+  cancel: { marginTop: spacing.sm },
+  cardActions: { flexDirection: 'row', alignItems: 'center', gap: spacing.lg },
   error: { ...type.caption, color: colors.danger, marginTop: spacing.md },
   head: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   day: { ...type.overline, color: colors.textFaint },

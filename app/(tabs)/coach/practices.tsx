@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Alert, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Badge } from '../../../components/Badge';
@@ -36,6 +37,8 @@ export default function CoachPractices() {
   const [practices, setPractices] = useState<Practice[]>([]);
   const [loading, setLoading] = useState(true);
 
+  /** The practice being edited, or null while composing a new one. */
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [startsAt, setStartsAt] = useState(defaultStart);
   const [location, setLocation] = useState('');
   const [meetingPoint, setMeetingPoint] = useState('');
@@ -64,7 +67,28 @@ export default function CoachPractices() {
     void load();
   }, [load]);
 
-  async function create() {
+  function resetForm() {
+    setEditingId(null);
+    setLocation('');
+    setMeetingPoint('');
+    setNotes('');
+    setAudience('clinic');
+    setStartsAt(defaultStart());
+    setError(null);
+  }
+
+  /** Loads a practice into the form above, so a typo is a correction not a retype. */
+  function startEditing(practice: Practice) {
+    setEditingId(practice.id);
+    setStartsAt(new Date(practice.starts_at));
+    setLocation(practice.location_name);
+    setMeetingPoint(practice.meeting_point ?? '');
+    setNotes(practice.notes ?? '');
+    setAudience(practice.audience);
+    setError(null);
+  }
+
+  async function save() {
     if (!profile) return;
     if (!location.trim()) {
       setError('Where is it? A location is needed.');
@@ -74,25 +98,25 @@ export default function CoachPractices() {
     setSaving(true);
     setError(null);
 
-    const { error: insertError } = await supabase.from('practices').insert({
+    const fields = {
       starts_at: startsAt.toISOString(),
       location_name: location.trim(),
       meeting_point: meetingPoint.trim() || null,
       notes: notes.trim() || null,
       audience,
-      created_by: profile.id,
-    });
+    };
+
+    const { error: writeError } = editingId
+      ? await supabase.from('practices').update(fields).eq('id', editingId)
+      : await supabase.from('practices').insert({ ...fields, created_by: profile.id });
 
     setSaving(false);
-    if (insertError) {
-      setError(insertError.message);
+    if (writeError) {
+      setError(writeError.message);
       return;
     }
 
-    setLocation('');
-    setMeetingPoint('');
-    setNotes('');
-    setStartsAt(defaultStart());
+    resetForm();
     await load();
   }
 
@@ -125,7 +149,9 @@ export default function CoachPractices() {
       avoidKeyboard
     >
       <Card accent="primary">
-        <Text style={styles.cardTitle}>Add to the schedule</Text>
+        <Text style={styles.cardTitle}>
+          {editingId ? 'Edit this practice' : 'Add to the schedule'}
+        </Text>
         <View style={styles.fields}>
           <DateTimeField label="When" value={startsAt} onChange={setStartsAt} />
           <TextField
@@ -153,7 +179,22 @@ export default function CoachPractices() {
 
         {error ? <Text style={styles.error}>{error}</Text> : null}
 
-        <Button label="Post practice" full loading={saving} onPress={create} style={styles.submit} />
+        <Button
+          label={editingId ? 'Save changes' : 'Post practice'}
+          full
+          loading={saving}
+          onPress={save}
+          style={styles.submit}
+        />
+        {editingId ? (
+          <Button
+            label="Cancel"
+            variant="ghost"
+            full
+            onPress={resetForm}
+            style={styles.cancel}
+          />
+        ) : null}
       </Card>
 
       <SectionHeader title="Scheduled" />
@@ -188,6 +229,23 @@ export default function CoachPractices() {
             <Text style={styles.meta}>{AUDIENCE_LABELS[practice.audience]}</Text>
 
             <View style={styles.rowActions}>
+              <RowAction
+                icon="create-outline"
+                label="Edit"
+                onPress={() => startEditing(practice)}
+              />
+
+              <RowAction
+                icon="checkbox-outline"
+                label="Attendance"
+                onPress={() =>
+                  router.push({
+                    pathname: '/(tabs)/coach/attendance/[id]',
+                    params: { id: practice.id },
+                  })
+                }
+              />
+
               {practice.status !== 'cancelled' ? (
                 <RowAction
                   icon="close-circle-outline"
@@ -252,6 +310,7 @@ const styles = StyleSheet.create({
   cardTitle: { ...type.heading, color: colors.text },
   fields: { gap: spacing.lg, marginTop: spacing.lg },
   submit: { marginTop: spacing.lg },
+  cancel: { marginTop: spacing.sm },
   error: { ...type.caption, color: colors.danger, marginTop: spacing.md },
   head: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.md },
   headText: { flex: 1 },
