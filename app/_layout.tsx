@@ -42,6 +42,10 @@ export default function RootLayout() {
                 options={{ ...stackHeader, headerShown: true, title: 'Athlete profile' }}
               />
               <Stack.Screen
+                name="settings"
+                options={{ ...stackHeader, headerShown: true, title: 'Settings' }}
+              />
+              <Stack.Screen
                 name="post/[id]"
                 options={{ ...stackHeader, headerShown: true, title: '' }}
               />

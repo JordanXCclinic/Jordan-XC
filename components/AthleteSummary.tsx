@@ -6,7 +6,6 @@ import { EmptyState, LoadingState } from './Screen';
 import { formatDuration } from '../lib/format';
 import { isSupabaseConfigured, supabase } from '../lib/supabase';
 import {
-  ATHLETE_PROFILE_COLUMNS,
   PERSONAL_BEST_COLUMNS,
   PB_EVENTS,
   type AthleteProfile,
@@ -30,12 +29,11 @@ export function AthleteSummary({ athleteId }: { athleteId: string }) {
       return;
     }
     setLoading(true);
+    // Read through the function rather than the table: it applies the same
+    // can_view_athlete() check and writes an audit_log row when the reader is
+    // staff, which is how a coach opening a minor's health record gets recorded.
     const [{ data: row }, { data: pbRows }] = await Promise.all([
-      supabase
-        .from('athlete_profiles')
-        .select(ATHLETE_PROFILE_COLUMNS)
-        .eq('athlete_id', athleteId)
-        .maybeSingle(),
+      supabase.rpc('staff_view_athlete_profile', { p_athlete: athleteId }),
       supabase.from('personal_bests').select(PERSONAL_BEST_COLUMNS).eq('athlete_id', athleteId),
     ]);
     setProfile((row as AthleteProfile | null) ?? null);

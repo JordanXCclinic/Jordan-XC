@@ -1,7 +1,6 @@
 import { router } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
-import { Ionicons } from '@expo/vector-icons';
-import { Alert, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { AthleteSummary } from '../../components/AthleteSummary';
 import { Avatar } from '../../components/Avatar';
 import { Badge } from '../../components/Badge';
@@ -16,7 +15,7 @@ import { colors, spacing, type } from '../../lib/theme';
 import { CLINIC_URL } from '../sign-in';
 
 export default function ProfileTab() {
-  const { profile, role, signOut } = useAuth();
+  const { profile, role } = useAuth();
   const { athletes, activeAthleteId, setActiveAthleteId, activeAthlete, refresh } = useAthlete();
 
   if (!profile) return null;
@@ -24,18 +23,6 @@ export default function ProfileTab() {
   const own = isAthlete(role);
   const staff = isCoach(role);
   const subject = own ? profile : activeAthlete;
-
-  function confirmSignOut() {
-    // web has no native Alert dialog, so there it signs out directly.
-    if (Platform.OS === 'web') {
-      void signOut();
-      return;
-    }
-    Alert.alert('Sign out?', 'You will need your Apple or Google account to get back in.', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Sign out', style: 'destructive', onPress: () => void signOut() },
-    ]);
-  }
 
   return (
     <Screen title={own ? 'Me' : 'Profile'} onRefresh={refresh}>
@@ -121,14 +108,13 @@ export default function ProfileTab() {
         onPress={() => void WebBrowser.openBrowserAsync(CLINIC_URL)}
       />
 
-      <Pressable
-        accessibilityRole="button"
-        onPress={confirmSignOut}
-        style={({ pressed }) => [styles.signOut, pressed && styles.pressed]}
-      >
-        <Ionicons name="log-out-outline" size={18} color={colors.danger} />
-        <Text style={styles.signOutText}>Sign out</Text>
-      </Pressable>
+      <SectionHeader title="Account" />
+      <ListRow
+        icon="settings-outline"
+        title="Settings"
+        subtitle="Privacy, your data, and signing out"
+        onPress={() => router.push('/settings')}
+      />
     </Screen>
   );
 }
@@ -139,14 +125,4 @@ const styles = StyleSheet.create({
   name: { ...type.title, color: colors.text },
   phone: { ...type.body, color: colors.textMuted, marginTop: spacing.md },
   edit: { ...type.label, color: colors.primary },
-  signOut: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.sm,
-    marginTop: spacing.xl,
-    paddingVertical: spacing.md,
-  },
-  pressed: { opacity: 0.7 },
-  signOutText: { ...type.bodyStrong, color: colors.danger },
 });

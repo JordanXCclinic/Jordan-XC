@@ -4,7 +4,7 @@ import { StyleSheet, type ColorValue } from 'react-native';
 import { FullScreenLoader } from '../../components/Screen';
 import { useAuth } from '../../lib/auth';
 import { isAthlete, isCoach } from '../../lib/types';
-import { colors, shadow, spacing, type } from '../../lib/theme';
+import { colors, shadow, type } from '../../lib/theme';
 
 const icon =
   (name: keyof typeof Ionicons.glyphMap) =>

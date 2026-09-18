@@ -418,3 +418,116 @@ begin
 end $$;
 
 reset role;
+
+-- ---------------------------------------------------------------------------
+-- Account deletion, export, and the medical-access trail (0007).
+--
+-- Apple will not approve an app that creates accounts but cannot delete them,
+-- so these pin the behaviour rather than just the permission.
+-- ---------------------------------------------------------------------------
+
+set role authenticated;
+
+-- A staff read of an intake form is recorded; the family reading their own is not.
+select set_config('request.jwt.claim.sub', :coach, false);
+select staff_view_athlete_profile(:athlete);
+
+select set_config('request.jwt.claim.sub', :athlete, false);
+select staff_view_athlete_profile(:athlete);
+
+reset role;
+do $$
+declare n_staff int; n_self int;
+begin
+  select count(*) into n_staff from audit_log
+   where action = 'read' and record_id = '22222222-2222-2222-2222-222222222222'
+     and actor_id = '11111111-1111-1111-1111-111111111111';
+  select count(*) into n_self from audit_log
+   where action = 'read' and record_id = '22222222-2222-2222-2222-222222222222'
+     and actor_id = '22222222-2222-2222-2222-222222222222';
+  if n_staff = 1 and n_self = 0
+  then raise notice 'PASS: staff reads of a medical record are logged, the athlete''s own are not';
+  else raise notice 'FAIL: audit trail wrong (staff %, self %)', n_staff, n_self;
+  end if;
+end $$;
+
+-- An unrelated athlete cannot read the record through the logging function either.
+set role authenticated;
+select set_config('request.jwt.claim.sub', :newathlete, false);
+do $$
+begin
+  perform staff_view_athlete_profile('22222222-2222-2222-2222-222222222222');
+  raise notice 'FAIL: the audit wrapper leaked another athlete''s record';
+exception when others then
+  raise notice 'PASS: the audit wrapper still refuses an unrelated athlete (%)', sqlerrm;
+end $$;
+
+-- Export hands a family their own data and nobody else's.
+select set_config('request.jwt.claim.sub', :athlete, false);
+do $$
+declare v jsonb;
+begin
+  v := export_my_data();
+  if v -> 'account' ->> 'id' = '22222222-2222-2222-2222-222222222222'
+     and v -> 'athlete_profile' ->> 'school' = 'Mountain Brook'
+  then raise notice 'PASS: export returns the signed-in family''s own record';
+  else raise notice 'FAIL: export payload wrong (%)', v;
+  end if;
+end $$;
+
+-- Deleting an athlete account really removes the athlete, the intake form, the
+-- personal bests and the guardian link — not just a flag.
+select set_config('request.jwt.claim.sub', :athlete, false);
+select delete_my_account();
+
+reset role;
+do $$
+declare n_profile int; n_intake int; n_pb int; n_link int; n_user int;
+begin
+  select count(*) into n_profile from profiles where id = '22222222-2222-2222-2222-222222222222';
+  select count(*) into n_intake from athlete_profiles where athlete_id = '22222222-2222-2222-2222-222222222222';
+  select count(*) into n_pb from personal_bests where athlete_id = '22222222-2222-2222-2222-222222222222';
+  select count(*) into n_link from guardian_links where athlete_id = '22222222-2222-2222-2222-222222222222';
+  select count(*) into n_user from auth.users where id = '22222222-2222-2222-2222-222222222222';
+  if n_profile = 0 and n_intake = 0 and n_pb = 0 and n_link = 0 and n_user = 0
+  then raise notice 'PASS: deleting an account removes the profile, intake form, bests and links';
+  else raise notice 'FAIL: data survived deletion (profile %, intake %, pb %, link %, user %)',
+       n_profile, n_intake, n_pb, n_link, n_user;
+  end if;
+end $$;
+
+-- The clinic's own records outlive a coach, and are handed to another coach
+-- rather than blocking the deletion or vanishing with them.
+insert into auth.users (id) values ('aaaaaaaa-1111-1111-1111-111111111111');
+insert into profiles (id, full_name, role) values ('aaaaaaaa-1111-1111-1111-111111111111', 'Bela Doss', 'coach');
+insert into practices (id, starts_at, location_name, created_by)
+values ('bbbbbbbb-1111-1111-1111-111111111111', now() + interval '2 days', 'Jemison Trail', :coach);
+
+set role authenticated;
+select set_config('request.jwt.claim.sub', :coach, false);
+select delete_my_account();
+
+reset role;
+do $$
+declare v_owner uuid; n_coach int;
+begin
+  select created_by into v_owner from practices where id = 'bbbbbbbb-1111-1111-1111-111111111111';
+  select count(*) into n_coach from profiles where id = '11111111-1111-1111-1111-111111111111';
+  if v_owner = 'aaaaaaaa-1111-1111-1111-111111111111' and n_coach = 0
+  then raise notice 'PASS: a departing coach''s practices pass to the remaining coach';
+  else raise notice 'FAIL: reassignment wrong (owner %, coach rows %)', v_owner, n_coach;
+  end if;
+end $$;
+
+-- The last coach cannot delete the clinic out from under everyone by accident.
+set role authenticated;
+select set_config('request.jwt.claim.sub', 'aaaaaaaa-1111-1111-1111-111111111111', false);
+do $$
+begin
+  perform delete_my_account();
+  raise notice 'FAIL: the only coach deleted themselves and orphaned the clinic';
+exception when others then
+  raise notice 'PASS: the only coach is told to add another coach first (%)', sqlerrm;
+end $$;
+
+reset role;
