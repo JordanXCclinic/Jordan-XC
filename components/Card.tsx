@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
-import { colors, radius, shadow, spacing, type } from '../lib/theme';
+import { radius, shadow, spacing, type, type Palette } from '../lib/theme';
+import { useTheme, useThemedStyles } from '../lib/appearance';
 
 type CardProps = {
   children: React.ReactNode;
@@ -11,11 +12,16 @@ type CardProps = {
 };
 
 export function Card({ children, onPress, accent, style }: CardProps) {
+
+  const c = useTheme();
+
+  const styles = useThemedStyles(makeStyles);
+
   const accentStyle =
     accent === 'primary'
-      ? { borderLeftWidth: 4, borderLeftColor: colors.primary }
+      ? { borderLeftWidth: 4, borderLeftColor: c.primary }
       : accent === 'danger'
-        ? { borderLeftWidth: 4, borderLeftColor: colors.danger }
+        ? { borderLeftWidth: 4, borderLeftColor: c.danger }
         : null;
 
   if (!onPress) return <View style={[styles.card, accentStyle, style]}>{children}</View>;
@@ -42,11 +48,14 @@ type RowProps = {
 
 /** A tappable line item: icon, two lines of text, and a chevron or custom right side. */
 export function ListRow({ title, subtitle, meta, icon, onPress, right }: RowProps) {
+  const c = useTheme();
+  const styles = useThemedStyles(makeStyles);
+
   const body = (
     <>
       {icon ? (
         <View style={styles.rowIcon}>
-          <Ionicons name={icon} size={18} color={colors.primary} />
+          <Ionicons name={icon} size={18} color={c.primary} />
         </View>
       ) : null}
       <View style={styles.rowText}>
@@ -61,7 +70,7 @@ export function ListRow({ title, subtitle, meta, icon, onPress, right }: RowProp
       </View>
       {right ?? (meta ? <Text style={styles.rowMeta}>{meta}</Text> : null)}
       {onPress && !right ? (
-        <Ionicons name="chevron-forward" size={18} color={colors.textFaint} />
+        <Ionicons name="chevron-forward" size={18} color={c.textFaint} />
       ) : null}
     </>
   );
@@ -79,12 +88,13 @@ export function ListRow({ title, subtitle, meta, icon, onPress, right }: RowProp
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (c: Palette) =>
+  StyleSheet.create({
   card: {
-    backgroundColor: colors.background,
+    backgroundColor: c.background,
     borderRadius: radius.lg,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: c.border,
     padding: spacing.lg,
     ...shadow.card,
   },
@@ -94,12 +104,12 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: radius.md,
-    backgroundColor: colors.primaryTint,
+    backgroundColor: c.primaryTint,
     alignItems: 'center',
     justifyContent: 'center',
   },
   rowText: { flex: 1, gap: 2 },
-  rowTitle: { ...type.bodyStrong, color: colors.text },
-  rowSubtitle: { ...type.caption, color: colors.textMuted, lineHeight: 17 },
-  rowMeta: { ...type.caption, color: colors.textFaint },
+  rowTitle: { ...type.bodyStrong, color: c.text },
+  rowSubtitle: { ...type.caption, color: c.textMuted, lineHeight: 17 },
+  rowMeta: { ...type.caption, color: c.textFaint },
 });

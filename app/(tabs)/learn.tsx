@@ -8,11 +8,17 @@ import { EmptyState, LoadingState, Screen } from '../../components/Screen';
 import { formatDate } from '../../lib/format';
 import { isSupabaseConfigured, supabase } from '../../lib/supabase';
 import { POST_COLUMNS, type Post } from '../../lib/types';
-import { colors, radius, spacing, type } from '../../lib/theme';
+import { radius, spacing, type, type Palette } from '../../lib/theme';
+import { useTheme, useThemedStyles } from '../../lib/appearance';
 
 const ALL = 'All';
 
 export default function Learn() {
+
+  const c = useTheme();
+
+  const styles = useThemedStyles(makeStyles);
+
   const [posts, setPosts] = useState<Post[]>([]);
   const [category, setCategory] = useState(ALL);
   const [loading, setLoading] = useState(true);
@@ -102,7 +108,7 @@ export default function Learn() {
                 {post.category ? <Text style={styles.category}>{post.category}</Text> : null}
                 {post.video_url ? (
                   <View style={styles.videoTag}>
-                    <Ionicons name="play-circle" size={14} color={colors.accent} />
+                    <Ionicons name="play-circle" size={14} color={c.accent} />
                     <Text style={styles.videoText}>Video</Text>
                   </View>
                 ) : null}
@@ -124,27 +130,28 @@ export default function Learn() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (c: Palette) =>
+  StyleSheet.create({
   filters: { gap: spacing.sm, paddingVertical: spacing.xs },
   filter: {
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.sm,
     borderRadius: radius.pill,
     borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
+    borderColor: c.border,
+    backgroundColor: c.surface,
   },
-  filterSelected: { backgroundColor: colors.primary, borderColor: colors.primary },
-  filterText: { ...type.label, color: colors.textMuted },
-  filterTextSelected: { color: colors.textInverse },
+  filterSelected: { backgroundColor: c.primarySurface, borderColor: c.primary },
+  filterText: { ...type.label, color: c.textMuted },
+  filterTextSelected: { color: c.textInverse },
   card: { padding: 0, overflow: 'hidden' },
-  hero: { width: '100%', height: 168, backgroundColor: colors.surfaceSunken },
+  hero: { width: '100%', height: 168, backgroundColor: c.surfaceSunken },
   cardBody: { padding: spacing.lg, gap: spacing.xs },
   metaRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
-  category: { ...type.overline, color: colors.primary },
+  category: { ...type.overline, color: c.primary },
   videoTag: { flexDirection: 'row', alignItems: 'center', gap: 3 },
-  videoText: { ...type.overline, color: colors.accent },
-  title: { ...type.heading, color: colors.text },
-  summary: { ...type.body, color: colors.textMuted },
-  date: { ...type.caption, color: colors.textFaint, marginTop: spacing.xs },
+  videoText: { ...type.overline, color: c.accent },
+  title: { ...type.heading, color: c.text },
+  summary: { ...type.body, color: c.textMuted },
+  date: { ...type.caption, color: c.textFaint, marginTop: spacing.xs },
 });

@@ -1,6 +1,5 @@
 import { useCallback, useState } from 'react';
-import {
-  ActivityIndicator,
+import { ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
   RefreshControl,
@@ -13,7 +12,8 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { colors, radius, spacing, type } from '../lib/theme';
+import { radius, spacing, type, type Palette } from '../lib/theme';
+import { useTheme, useThemedStyles } from '../lib/appearance';
 
 type ScreenProps = {
   title?: string;
@@ -40,6 +40,11 @@ export function Screen({
   contentStyle,
   children,
 }: ScreenProps) {
+
+  const c = useTheme();
+
+  const styles = useThemedStyles(makeStyles);
+
   const insets = useSafeAreaInsets();
   const [refreshing, setRefreshing] = useState(false);
 
@@ -71,8 +76,8 @@ export function Screen({
           <RefreshControl
             refreshing={refreshing}
             onRefresh={handleRefresh}
-            tintColor={colors.primary}
-            colors={[colors.primary]}
+            tintColor={c.primary}
+            colors={[c.primary]}
           />
         ) : undefined
       }
@@ -112,6 +117,11 @@ export function SectionHeader({
   title: string;
   action?: React.ReactNode;
 }) {
+
+  const c = useTheme();
+
+  const styles = useThemedStyles(makeStyles);
+
   return (
     <View style={styles.section}>
       <Text style={styles.sectionTitle}>{title}</Text>
@@ -129,10 +139,15 @@ export function EmptyState({
   icon?: keyof typeof Ionicons.glyphMap;
   action?: React.ReactNode;
 }) {
+
+  const c = useTheme();
+
+  const styles = useThemedStyles(makeStyles);
+
   return (
     <View style={styles.empty}>
       <View style={styles.emptyIcon}>
-        <Ionicons name={icon} size={22} color={colors.primary} />
+        <Ionicons name={icon} size={22} color={c.primary} />
       </View>
       <Text style={styles.emptyText}>{message}</Text>
       {action}
@@ -141,9 +156,14 @@ export function EmptyState({
 }
 
 export function LoadingState({ label }: { label?: string }) {
+
+  const c = useTheme();
+
+  const styles = useThemedStyles(makeStyles);
+
   return (
     <View style={styles.loading}>
-      <ActivityIndicator color={colors.primary} />
+      <ActivityIndicator color={c.primary} />
       {label ? <Text style={styles.loadingLabel}>{label}</Text> : null}
     </View>
   );
@@ -151,20 +171,24 @@ export function LoadingState({ label }: { label?: string }) {
 
 /** Full-bleed centered spinner for route-level gates. */
 export function FullScreenLoader() {
+  const c = useTheme();
+  const styles = useThemedStyles(makeStyles);
+
   return (
     <View style={styles.full}>
-      <ActivityIndicator color={colors.primary} size="large" />
+      <ActivityIndicator color={c.primary} size="large" />
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.background },
+const makeStyles = (c: Palette) =>
+  StyleSheet.create({
+  root: { flex: 1, backgroundColor: c.background },
   content: { paddingHorizontal: spacing.lg },
   header: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md },
   headerText: { flex: 1 },
-  title: { ...type.display, color: colors.text },
-  subtitle: { ...type.body, color: colors.textMuted, marginTop: spacing.xs },
+  title: { ...type.display, color: c.text },
+  subtitle: { ...type.body, color: c.textMuted, marginTop: spacing.xs },
   body: { marginTop: spacing.lg, gap: spacing.md },
   section: {
     flexDirection: 'row',
@@ -172,27 +196,27 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginTop: spacing.md,
   },
-  sectionTitle: { ...type.overline, color: colors.textFaint, textTransform: 'uppercase' },
+  sectionTitle: { ...type.overline, color: c.textFaint, textTransform: 'uppercase' },
   empty: {
     alignItems: 'center',
     gap: spacing.md,
     paddingVertical: spacing.xl,
     paddingHorizontal: spacing.lg,
-    backgroundColor: colors.surface,
+    backgroundColor: c.surface,
     borderRadius: radius.lg,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: c.border,
   },
   emptyIcon: {
     width: 44,
     height: 44,
     borderRadius: radius.pill,
-    backgroundColor: colors.primaryTint,
+    backgroundColor: c.primaryTint,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  emptyText: { ...type.body, color: colors.textMuted, textAlign: 'center' },
+  emptyText: { ...type.body, color: c.textMuted, textAlign: 'center' },
   loading: { paddingVertical: spacing.xl, alignItems: 'center', gap: spacing.sm },
-  loadingLabel: { ...type.caption, color: colors.textFaint },
-  full: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.background },
+  loadingLabel: { ...type.caption, color: c.textFaint },
+  full: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: c.background },
 });

@@ -4,7 +4,8 @@ import { StyleSheet, type ColorValue } from 'react-native';
 import { FullScreenLoader } from '../../components/Screen';
 import { useAuth } from '../../lib/auth';
 import { isAthlete, isCoach } from '../../lib/types';
-import { colors, shadow, type } from '../../lib/theme';
+import { shadow, type, type Palette } from '../../lib/theme';
+import { useTheme, useThemedStyles } from '../../lib/appearance';
 
 const icon =
   (name: keyof typeof Ionicons.glyphMap) =>
@@ -15,6 +16,9 @@ const icon =
 // This layout owns the auth gate. A separate index route would collide with
 // (tabs)/index at "/" and swallow every other tab.
 export default function TabsLayout() {
+  const c = useTheme();
+  const styles = useThemedStyles(makeStyles);
+
   const { session, profile, role, loading, profileLoaded, onboarded } = useAuth();
 
   if (loading || (session && !profileLoaded)) return <FullScreenLoader />;
@@ -29,8 +33,8 @@ export default function TabsLayout() {
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: colors.primary,
-        tabBarInactiveTintColor: colors.textFaint,
+        tabBarActiveTintColor: c.primary,
+        tabBarInactiveTintColor: c.textFaint,
         tabBarStyle: styles.bar,
         tabBarLabelStyle: styles.label,
         tabBarItemStyle: styles.item,
@@ -68,11 +72,12 @@ export default function TabsLayout() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (c: Palette) =>
+  StyleSheet.create({
   bar: {
-    backgroundColor: colors.background,
+    backgroundColor: c.background,
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.border,
+    borderTopColor: c.border,
     ...shadow.card,
   },
   label: { ...type.caption, fontSize: 11, fontWeight: '600' },

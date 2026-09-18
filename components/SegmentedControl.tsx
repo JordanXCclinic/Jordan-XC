@@ -1,5 +1,6 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { colors, radius, spacing, type } from '../lib/theme';
+import { radius, spacing, type, type Palette } from '../lib/theme';
+import { useTheme, useThemedStyles } from '../lib/appearance';
 
 type Props<T extends string> = {
   options: readonly { value: T; label: string }[];
@@ -9,6 +10,9 @@ type Props<T extends string> = {
 
 /** Top-level view switch — parents picking an athlete, coaches picking a week. */
 export function SegmentedControl<T extends string>({ options, value, onChange }: Props<T>) {
+  const c = useTheme();
+  const styles = useThemedStyles(makeStyles);
+
   return (
     <View style={styles.track} accessibilityRole="tablist">
       {options.map((option) => {
@@ -31,10 +35,11 @@ export function SegmentedControl<T extends string>({ options, value, onChange }:
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (c: Palette) =>
+  StyleSheet.create({
   track: {
     flexDirection: 'row',
-    backgroundColor: colors.surfaceSunken,
+    backgroundColor: c.surfaceSunken,
     borderRadius: radius.md,
     padding: 3,
     gap: 3,
@@ -47,7 +52,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.sm,
     minHeight: 36,
   },
-  segmentSelected: { backgroundColor: colors.background },
-  text: { ...type.label, color: colors.textMuted },
-  textSelected: { color: colors.primary },
+  segmentSelected: { backgroundColor: c.background },
+  text: { ...type.label, color: c.textMuted },
+  textSelected: { color: c.primary },
 });

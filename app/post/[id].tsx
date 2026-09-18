@@ -8,9 +8,15 @@ import { EmptyState, LoadingState, Screen } from '../../components/Screen';
 import { formatDate } from '../../lib/format';
 import { isSupabaseConfigured, supabase } from '../../lib/supabase';
 import { POST_COLUMNS, type Post } from '../../lib/types';
-import { colors, radius, spacing, type } from '../../lib/theme';
+import { radius, spacing, type, type Palette } from '../../lib/theme';
+import { useTheme, useThemedStyles } from '../../lib/appearance';
 
 export default function PostDetail() {
+
+  const c = useTheme();
+
+  const styles = useThemedStyles(makeStyles);
+
   const { id } = useLocalSearchParams<{ id: string }>();
   const [post, setPost] = useState<Post | null>(null);
   const [loading, setLoading] = useState(true);
@@ -82,24 +88,25 @@ export default function PostDetail() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (c: Palette) =>
+  StyleSheet.create({
   hero: {
     width: '100%',
     height: 200,
     borderRadius: radius.lg,
-    backgroundColor: colors.surfaceSunken,
+    backgroundColor: c.surfaceSunken,
   },
   head: { gap: spacing.xs },
-  category: { ...type.overline, color: colors.primary },
-  title: { ...type.display, color: colors.text, fontSize: 26, lineHeight: 32 },
-  date: { ...type.caption, color: colors.textFaint },
+  category: { ...type.overline, color: c.primary },
+  title: { ...type.display, color: c.text, fontSize: 26, lineHeight: 32 },
+  date: { ...type.caption, color: c.textFaint },
   summary: {
     ...type.body,
-    color: colors.text,
+    color: c.text,
     fontWeight: '600',
     borderLeftWidth: 3,
-    borderLeftColor: colors.primary,
+    borderLeftColor: c.primary,
     paddingLeft: spacing.md,
   },
-  body: { ...type.body, color: colors.textMuted, lineHeight: 25 },
+  body: { ...type.body, color: c.textMuted, lineHeight: 25 },
 });

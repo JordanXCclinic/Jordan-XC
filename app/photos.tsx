@@ -2,8 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
-import {
-  Alert,
+import { Alert,
   Modal,
   Platform,
   Pressable,
@@ -19,12 +18,18 @@ import { formatDate } from '../lib/format';
 import { deletePhoto, signPhotoUrls, uploadPhoto } from '../lib/photos';
 import { isSupabaseConfigured, supabase } from '../lib/supabase';
 import { PHOTO_COLUMNS, isCoach, type Photo } from '../lib/types';
-import { colors, radius, spacing, type } from '../lib/theme';
+import { radius, spacing, type, type Palette } from '../lib/theme';
+import { useTheme, useThemedStyles } from '../lib/appearance';
 
 const GUTTER = spacing.sm;
 const COLUMNS = 2;
 
 export default function Photos() {
+
+  const c = useTheme();
+
+  const styles = useThemedStyles(makeStyles);
+
   const { profile, role } = useAuth();
   const { width } = useWindowDimensions();
   const [photos, setPhotos] = useState<Photo[]>([]);
@@ -211,7 +216,7 @@ export default function Photos() {
                 onPress={() => confirmDelete(viewing)}
                 hitSlop={10}
               >
-                <Ionicons name="trash-outline" size={22} color={colors.textInverse} />
+                <Ionicons name="trash-outline" size={22} color={c.textInverse} />
               </Pressable>
             ) : null}
 
@@ -221,7 +226,7 @@ export default function Photos() {
               onPress={() => setViewing(null)}
               hitSlop={10}
             >
-              <Ionicons name="close" size={24} color={colors.textInverse} />
+              <Ionicons name="close" size={24} color={c.textInverse} />
             </Pressable>
           </View>
         </View>
@@ -230,16 +235,17 @@ export default function Photos() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (c: Palette) =>
+  StyleSheet.create({
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: GUTTER },
   tile: {
     borderRadius: radius.md,
     overflow: 'hidden',
-    backgroundColor: colors.surfaceSunken,
+    backgroundColor: c.surfaceSunken,
   },
   pressed: { opacity: 0.85 },
   image: { width: '100%', height: '100%' },
-  error: { ...type.caption, color: colors.danger },
+  error: { ...type.caption, color: c.danger },
   viewer: { flex: 1, backgroundColor: 'rgba(0,0,0,0.94)', justifyContent: 'center' },
   viewerBackdrop: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
   viewerImage: { width: '100%', height: '70%' },
@@ -255,6 +261,6 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.xxl,
   },
   viewerText: { flex: 1, gap: 2 },
-  caption: { ...type.bodyStrong, color: colors.textInverse },
-  captionMeta: { ...type.caption, color: colors.borderStrong },
+  caption: { ...type.bodyStrong, color: c.textInverse },
+  captionMeta: { ...type.caption, color: c.borderStrong },
 });

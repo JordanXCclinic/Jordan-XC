@@ -11,13 +11,19 @@ import { isSupabaseConfigured, supabase } from '../../../lib/supabase';
 import { useAuth } from '../../../lib/auth';
 import { INVITE_CODE_COLUMNS, isHeadCoach, type InviteCode } from '../../../lib/types';
 import { roleLabel } from '../../../lib/format';
-import { colors, radius, spacing, type } from '../../../lib/theme';
+import { radius, spacing, type, type Palette } from '../../../lib/theme';
+import { useTheme, useThemedStyles } from '../../../lib/appearance';
 
 const SEASON = String(new Date().getFullYear());
 
 type Issued = { athlete_code: string; parent_code: string; name: string };
 
 export default function Codes() {
+
+  const c = useTheme();
+
+  const styles = useThemedStyles(makeStyles);
+
   const { role } = useAuth();
   const [name, setName] = useState('');
   const [oneOnOne, setOneOnOne] = useState(false);
@@ -161,7 +167,7 @@ export default function Codes() {
                 <Ionicons
                   name={copied === kind ? 'checkmark-circle' : 'copy-outline'}
                   size={17}
-                  color={copied === kind ? colors.success : colors.primary}
+                  color={copied === kind ? c.success : c.primary}
                 />
                 <Text style={[styles.copyText, copied === kind && styles.copiedText]}>
                   {copied === kind ? 'Copied' : 'Copy'}
@@ -200,7 +206,7 @@ export default function Codes() {
                 <Ionicons
                   name={copied === code.id ? 'checkmark-circle' : 'copy-outline'}
                   size={16}
-                  color={copied === code.id ? colors.success : colors.textFaint}
+                  color={copied === code.id ? c.success : c.textFaint}
                 />
               </Pressable>
             </View>
@@ -211,31 +217,32 @@ export default function Codes() {
   );
 }
 
-const styles = StyleSheet.create({
-  cardTitle: { ...type.heading, color: colors.text },
-  hint: { ...type.caption, color: colors.textMuted, marginTop: spacing.xs, lineHeight: 17 },
+const makeStyles = (c: Palette) =>
+  StyleSheet.create({
+  cardTitle: { ...type.heading, color: c.text },
+  hint: { ...type.caption, color: c.textMuted, marginTop: spacing.xs, lineHeight: 17 },
   fields: { gap: spacing.lg, marginTop: spacing.lg },
   submit: { marginTop: spacing.lg },
-  error: { ...type.caption, color: colors.danger, marginTop: spacing.md },
+  error: { ...type.caption, color: c.danger, marginTop: spacing.md },
   codeRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: colors.surface,
+    backgroundColor: c.surface,
     borderRadius: radius.md,
     padding: spacing.lg,
     marginTop: spacing.md,
     gap: spacing.md,
   },
   codeText: { flex: 1, gap: spacing.xs },
-  codeLabel: { ...type.caption, color: colors.textMuted },
-  code: { ...type.title, color: colors.text, letterSpacing: 3 },
+  codeLabel: { ...type.caption, color: c.textMuted },
+  code: { ...type.title, color: c.text, letterSpacing: 3 },
   copy: { alignItems: 'center', gap: 2 },
-  copyText: { ...type.caption, color: colors.primary, fontWeight: '700' },
-  copiedText: { color: colors.success },
+  copyText: { ...type.caption, color: c.primary, fontWeight: '700' },
+  copiedText: { color: c.success },
   pressed: { opacity: 0.7 },
   row: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
-  name: { ...type.bodyStrong, color: colors.text },
+  name: { ...type.bodyStrong, color: c.text },
   rowCodeWrap: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  rowCode: { ...type.bodyStrong, color: colors.primary, letterSpacing: 1.5 },
+  rowCode: { ...type.bodyStrong, color: c.primary, letterSpacing: 1.5 },
 });

@@ -5,8 +5,9 @@ import { Button } from './Button';
 import { TextField } from './Field';
 import { parseDuration } from '../lib/format';
 import { supabase } from '../lib/supabase';
-import { colors, radius, spacing, type } from '../lib/theme';
+import { radius, spacing, type, type Palette } from '../lib/theme';
 import type { Workout } from '../lib/types';
+import { useTheme, useThemedStyles } from '../lib/appearance';
 
 const EFFORTS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 
@@ -19,6 +20,9 @@ type Props = {
 
 /** How an athlete says "done" — distance, time, and how hard it felt. */
 export function WorkoutLogSheet({ workout, athleteId, onClose, onSaved }: Props) {
+  const c = useTheme();
+  const styles = useThemedStyles(makeStyles);
+
   const [distance, setDistance] = useState('');
   const [duration, setDuration] = useState('');
   const [effort, setEffort] = useState<number | null>(null);
@@ -139,7 +143,7 @@ export function WorkoutLogSheet({ workout, athleteId, onClose, onSaved }: Props)
 
           {error ? (
             <View style={styles.error}>
-              <Ionicons name="alert-circle" size={16} color={colors.danger} />
+              <Ionicons name="alert-circle" size={16} color={c.danger} />
               <Text style={styles.errorText}>{error}</Text>
             </View>
           ) : null}
@@ -154,10 +158,11 @@ export function WorkoutLogSheet({ workout, athleteId, onClose, onSaved }: Props)
   );
 }
 
-const styles = StyleSheet.create({
-  backdrop: { flex: 1, backgroundColor: colors.overlay },
+const makeStyles = (c: Palette) =>
+  StyleSheet.create({
+  backdrop: { flex: 1, backgroundColor: c.overlay },
   sheet: {
-    backgroundColor: colors.background,
+    backgroundColor: c.background,
     borderTopLeftRadius: radius.xl,
     borderTopRightRadius: radius.xl,
     maxHeight: '88%',
@@ -166,15 +171,15 @@ const styles = StyleSheet.create({
     width: 36,
     height: 4,
     borderRadius: radius.pill,
-    backgroundColor: colors.borderStrong,
+    backgroundColor: c.borderStrong,
     alignSelf: 'center',
     marginTop: spacing.md,
   },
   content: { padding: spacing.xl, gap: spacing.lg },
-  kicker: { ...type.overline, color: colors.primary },
-  title: { ...type.title, color: colors.text, marginTop: -spacing.sm },
-  label: { ...type.label, color: colors.text },
-  hint: { ...type.caption, color: colors.textFaint },
+  kicker: { ...type.overline, color: c.primary },
+  title: { ...type.title, color: c.text, marginTop: -spacing.sm },
+  label: { ...type.label, color: c.text },
+  hint: { ...type.caption, color: c.textFaint },
   effortBlock: { gap: spacing.sm },
   efforts: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   effort: {
@@ -182,16 +187,16 @@ const styles = StyleSheet.create({
     height: 40,
     borderRadius: radius.pill,
     borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
+    borderColor: c.border,
+    backgroundColor: c.surface,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  effortSelected: { backgroundColor: colors.primary, borderColor: colors.primary },
-  effortText: { ...type.bodyStrong, color: colors.textMuted },
-  effortTextSelected: { color: colors.textInverse },
+  effortSelected: { backgroundColor: c.primarySurface, borderColor: c.primary },
+  effortText: { ...type.bodyStrong, color: c.textMuted },
+  effortTextSelected: { color: c.textInverse },
   error: { flexDirection: 'row', gap: spacing.sm, alignItems: 'center' },
-  errorText: { ...type.caption, color: colors.danger, flex: 1 },
+  errorText: { ...type.caption, color: c.danger, flex: 1 },
   actions: { flexDirection: 'row', gap: spacing.md, marginTop: spacing.sm },
   action: { flex: 1 },
 });

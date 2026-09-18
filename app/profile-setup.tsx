@@ -11,7 +11,8 @@ import { useAuth } from '../lib/auth';
 import { firstName } from '../lib/format';
 import { supabase } from '../lib/supabase';
 import { isAthlete } from '../lib/types';
-import { colors, radius, spacing, type } from '../lib/theme';
+import { radius, spacing, type, type Palette } from '../lib/theme';
+import { useTheme, useThemedStyles } from '../lib/appearance';
 
 /**
  * The first screen after a code is redeemed. An athlete fills in the full intake
@@ -19,6 +20,9 @@ import { colors, radius, spacing, type } from '../lib/theme';
  * which keeps this screen short for whoever signs in on the drive home.
  */
 export default function ProfileSetup() {
+  const c = useTheme();
+  const styles = useThemedStyles(makeStyles);
+
   const { profile, role, loading, profileLoaded, refreshProfile } = useAuth();
   const [name, setName] = useState(profile?.full_name ?? '');
   const [phone, setPhone] = useState(profile?.phone ?? '');
@@ -72,7 +76,7 @@ export default function ProfileSetup() {
     >
       <View style={styles.welcome}>
         <View style={styles.welcomeIcon}>
-          <Ionicons name="checkmark-circle" size={20} color={colors.success} />
+          <Ionicons name="checkmark-circle" size={20} color={c.success} />
         </View>
         <Text style={styles.welcomeText}>
           Code accepted{firstName(profile.full_name) ? `, ${firstName(profile.full_name)}` : ''}.
@@ -139,19 +143,20 @@ export default function ProfileSetup() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (c: Palette) =>
+  StyleSheet.create({
   welcome: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.md,
-    backgroundColor: colors.successTint,
+    backgroundColor: c.successTint,
     borderRadius: radius.md,
     padding: spacing.md,
   },
   welcomeIcon: { alignItems: 'center', justifyContent: 'center' },
-  welcomeText: { ...type.bodyStrong, color: colors.success, flex: 1 },
-  cardTitle: { ...type.heading, color: colors.text },
-  cardHint: { ...type.caption, color: colors.textMuted, marginTop: spacing.xs, lineHeight: 17 },
+  welcomeText: { ...type.bodyStrong, color: c.success, flex: 1 },
+  cardTitle: { ...type.heading, color: c.text },
+  cardHint: { ...type.caption, color: c.textMuted, marginTop: spacing.xs, lineHeight: 17 },
   fields: { gap: spacing.lg, marginTop: spacing.lg },
-  error: { ...type.body, color: colors.danger },
+  error: { ...type.body, color: c.danger },
 });

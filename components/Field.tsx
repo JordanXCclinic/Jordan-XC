@@ -1,6 +1,5 @@
 import { useState } from 'react';
-import {
-  Pressable,
+import { Pressable,
   StyleSheet,
   Switch,
   Text,
@@ -9,7 +8,8 @@ import {
   type KeyboardTypeOptions,
   type TextInputProps,
 } from 'react-native';
-import { colors, radius, spacing, type } from '../lib/theme';
+import { radius, spacing, type, type Palette } from '../lib/theme';
+import { useTheme, useThemedStyles } from '../lib/appearance';
 
 type FieldProps = {
   label: string;
@@ -40,6 +40,11 @@ export function TextField({
   textContentType,
   maxLength,
 }: FieldProps) {
+
+  const c = useTheme();
+
+  const styles = useThemedStyles(makeStyles);
+
   const [focused, setFocused] = useState(false);
 
   return (
@@ -60,7 +65,7 @@ export function TextField({
         onFocus={() => setFocused(true)}
         onBlur={() => setFocused(false)}
         placeholder={placeholder}
-        placeholderTextColor={colors.textFaint}
+        placeholderTextColor={c.textFaint}
         multiline={multiline}
         numberOfLines={multiline ? 4 : 1}
         textAlignVertical={multiline ? 'top' : 'center'}
@@ -97,6 +102,9 @@ export function ChipSelect<T extends string>({
   hint?: string;
   required?: boolean;
 }) {
+  const c = useTheme();
+  const styles = useThemedStyles(makeStyles);
+
   return (
     <View style={styles.field}>
       <Text style={styles.label}>
@@ -141,6 +149,11 @@ export function SwitchRow({
   value: boolean;
   onValueChange: (next: boolean) => void;
 }) {
+
+  const c = useTheme();
+
+  const styles = useThemedStyles(makeStyles);
+
   return (
     <View style={styles.switchRow}>
       <View style={styles.switchText}>
@@ -150,49 +163,50 @@ export function SwitchRow({
       <Switch
         value={value}
         onValueChange={onValueChange}
-        trackColor={{ true: colors.primary, false: colors.borderStrong }}
-        thumbColor={colors.background}
+        trackColor={{ true: c.primary, false: c.borderStrong }}
+        thumbColor={c.background}
         accessibilityLabel={label}
       />
     </View>
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (c: Palette) =>
+  StyleSheet.create({
   field: { gap: spacing.sm },
-  label: { ...type.label, color: colors.text },
-  required: { color: colors.danger },
+  label: { ...type.label, color: c.text },
+  required: { color: c.danger },
   input: {
     borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
+    borderColor: c.border,
+    backgroundColor: c.surface,
     borderRadius: radius.md,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
     minHeight: 46,
     ...type.body,
-    color: colors.text,
+    color: c.text,
   },
-  inputFocused: { borderColor: colors.primary, backgroundColor: colors.background },
-  inputError: { borderColor: colors.danger },
+  inputFocused: { borderColor: c.primary, backgroundColor: c.background },
+  inputError: { borderColor: c.danger },
   multiline: { minHeight: 104, paddingTop: spacing.md },
-  hint: { ...type.caption, color: colors.textFaint },
-  error: { ...type.caption, color: colors.danger },
+  hint: { ...type.caption, color: c.textFaint },
+  error: { ...type.caption, color: c.danger },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   chip: {
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
     borderRadius: radius.pill,
     borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
+    borderColor: c.border,
+    backgroundColor: c.surface,
     minHeight: 40,
     justifyContent: 'center',
   },
-  chipSelected: { backgroundColor: colors.primary, borderColor: colors.primary },
+  chipSelected: { backgroundColor: c.primarySurface, borderColor: c.primary },
   chipPressed: { opacity: 0.85 },
-  chipText: { ...type.label, color: colors.textMuted },
-  chipTextSelected: { color: colors.textInverse },
+  chipText: { ...type.label, color: c.textMuted },
+  chipTextSelected: { color: c.textInverse },
   switchRow: {
     flexDirection: 'row',
     alignItems: 'center',

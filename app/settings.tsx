@@ -9,12 +9,13 @@ import { Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from '
 import { Button } from '../components/Button';
 import { Card, ListRow } from '../components/Card';
 import { SwitchRow } from '../components/Field';
+import { SegmentedControl } from '../components/SegmentedControl';
 import { Screen, SectionHeader } from '../components/Screen';
+import { useAppearance, type ThemeMode } from '../lib/appearance';
 import { useAuth } from '../lib/auth';
 import { roleLabel } from '../lib/format';
 import { PRIVACY_POLICY_URL, SUPPORT_EMAIL, TERMS_URL, isPrivateRelay, providerLabel } from '../lib/legal';
-import {
-  DEFAULT_PREFS,
+import { DEFAULT_PREFS,
   PREF_LABELS,
   disableNotifications,
   enableNotifications,
@@ -22,11 +23,18 @@ import {
   type NotificationPrefs,
 } from '../lib/notifications';
 import { supabase } from '../lib/supabase';
-import { colors, radius, spacing, type } from '../lib/theme';
+import { radius, spacing, type, type Palette } from '../lib/theme';
 import { CLINIC_URL } from './sign-in';
+import { useTheme, useThemedStyles } from '../lib/appearance';
 
 export default function Settings() {
+
+  const c = useTheme();
+
+  const styles = useThemedStyles(makeStyles);
+
   const { profile, session, signOut, refreshProfile } = useAuth();
+  const { mode, setMode } = useAppearance();
   const [pushOn, setPushOn] = useState(Boolean(profile?.push_token));
   const [prefs, setPrefs] = useState<NotificationPrefs>(profile?.notification_prefs ?? DEFAULT_PREFS);
   const [pushBusy, setPushBusy] = useState(false);
@@ -144,7 +152,7 @@ export default function Settings() {
 
         {relay ? (
           <View style={styles.relay}>
-            <Ionicons name="eye-off-outline" size={16} color={colors.warning} />
+            <Ionicons name="eye-off-outline" size={16} color={c.warning} />
             <Text style={styles.relayText}>
               This is an Apple private relay address. Mail still reaches you, but it will not
               match the address on your clinic registration.
@@ -177,6 +185,19 @@ export default function Settings() {
         subtitle="Registration, payment, and waivers"
         onPress={() => void WebBrowser.openBrowserAsync(CLINIC_URL)}
       />
+
+      <SectionHeader title="Appearance" />
+      <Card>
+        <SegmentedControl
+          options={[
+            { value: 'system', label: 'Match device' },
+            { value: 'light', label: 'Light' },
+            { value: 'dark', label: 'Dark' },
+          ]}
+          value={mode}
+          onChange={(next) => setMode(next as ThemeMode)}
+        />
+      </Card>
 
       <SectionHeader title="Notifications" />
       <Card>
@@ -253,7 +274,7 @@ export default function Settings() {
         onPress={() => void signOut()}
         style={({ pressed }) => [styles.signOut, pressed && styles.pressed]}
       >
-        <Ionicons name="log-out-outline" size={18} color={colors.textMuted} />
+        <Ionicons name="log-out-outline" size={18} color={c.textMuted} />
         <Text style={styles.signOutText}>Sign out</Text>
       </Pressable>
 
@@ -267,7 +288,7 @@ export default function Settings() {
           <View style={styles.dialog}>
             <ScrollView contentContainerStyle={styles.dialogBody}>
               <View style={styles.dialogIcon}>
-                <Ionicons name="warning" size={22} color={colors.danger} />
+                <Ionicons name="warning" size={22} color={c.danger} />
               </View>
               <Text style={styles.dialogTitle}>Delete your account?</Text>
               <Text style={styles.dialogText}>
@@ -304,6 +325,11 @@ export default function Settings() {
 }
 
 function Detail({ label, value }: { label: string; value: string }) {
+
+  const c = useTheme();
+
+  const styles = useThemedStyles(makeStyles);
+
   return (
     <View style={styles.detail}>
       <Text style={styles.detailLabel}>{label}</Text>
@@ -314,32 +340,33 @@ function Detail({ label, value }: { label: string; value: string }) {
   );
 }
 
-const styles = StyleSheet.create({
-  cardTitle: { ...type.heading, color: colors.text },
-  cardHint: { ...type.caption, color: colors.textMuted, marginTop: spacing.xs, lineHeight: 17 },
+const makeStyles = (c: Palette) =>
+  StyleSheet.create({
+  cardTitle: { ...type.heading, color: c.text },
+  cardHint: { ...type.caption, color: c.textMuted, marginTop: spacing.xs, lineHeight: 17 },
   rows: { marginTop: spacing.md, gap: spacing.sm },
   detail: { flexDirection: 'row', justifyContent: 'space-between', gap: spacing.lg },
-  detailLabel: { ...type.caption, color: colors.textFaint },
-  detailValue: { ...type.body, color: colors.text, flexShrink: 1 },
+  detailLabel: { ...type.caption, color: c.textFaint },
+  detailValue: { ...type.body, color: c.text, flexShrink: 1 },
   relay: {
     flexDirection: 'row',
     gap: spacing.sm,
-    backgroundColor: colors.warningTint,
+    backgroundColor: c.warningTint,
     borderRadius: radius.md,
     padding: spacing.md,
     marginTop: spacing.md,
   },
-  relayText: { ...type.caption, color: colors.warning, flex: 1, lineHeight: 17 },
+  relayText: { ...type.caption, color: c.warning, flex: 1, lineHeight: 17 },
   action: { marginTop: spacing.lg },
   prefs: {
     gap: spacing.lg,
     marginTop: spacing.lg,
     paddingTop: spacing.lg,
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.border,
+    borderTopColor: c.border,
   },
-  note: { ...type.caption, color: colors.success, marginTop: spacing.md },
-  error: { ...type.caption, color: colors.danger, marginTop: spacing.md },
+  note: { ...type.caption, color: c.success, marginTop: spacing.md },
+  error: { ...type.caption, color: c.danger, marginTop: spacing.md },
   signOut: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -349,16 +376,16 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.md,
   },
   pressed: { opacity: 0.7 },
-  signOutText: { ...type.bodyStrong, color: colors.textMuted },
+  signOutText: { ...type.bodyStrong, color: c.textMuted },
   backdrop: {
     flex: 1,
-    backgroundColor: colors.overlay,
+    backgroundColor: c.overlay,
     alignItems: 'center',
     justifyContent: 'center',
     padding: spacing.lg,
   },
   dialog: {
-    backgroundColor: colors.background,
+    backgroundColor: c.background,
     borderRadius: radius.xl,
     maxWidth: 420,
     width: '100%',
@@ -369,12 +396,12 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: radius.pill,
-    backgroundColor: colors.dangerTint,
+    backgroundColor: c.dangerTint,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  dialogTitle: { ...type.title, color: colors.text },
-  dialogText: { ...type.body, color: colors.textMuted },
+  dialogTitle: { ...type.title, color: c.text },
+  dialogText: { ...type.body, color: c.textMuted },
   // Stacked rather than side by side: "Keep my account" does not fit on half a
   // phone's width, and a full-width destructive button is harder to mis-tap.
   dialogActions: { gap: spacing.md, marginTop: spacing.sm },

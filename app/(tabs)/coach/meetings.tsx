@@ -10,13 +10,13 @@ import { EmptyState, LoadingState, Screen, SectionHeader } from '../../../compon
 import { useAuth } from '../../../lib/auth';
 import { formatDayHeading, formatTime } from '../../../lib/format';
 import { isSupabaseConfigured, supabase } from '../../../lib/supabase';
-import {
-  MEETING_MODE_LABELS,
+import { MEETING_MODE_LABELS,
   MEETING_SLOT_COLUMNS,
   type MeetingMode,
   type MeetingSlot,
 } from '../../../lib/types';
-import { colors, spacing, type } from '../../../lib/theme';
+import { spacing, type, type Palette } from '../../../lib/theme';
+import { useTheme, useThemedStyles } from '../../../lib/appearance';
 
 const DURATIONS = [
   { value: '15', label: '15 min' },
@@ -38,6 +38,11 @@ function defaultStart(): Date {
 }
 
 export default function CoachMeetings() {
+
+  const c = useTheme();
+
+  const styles = useThemedStyles(makeStyles);
+
   const { profile } = useAuth();
   const [slots, setSlots] = useState<MeetingSlot[]>([]);
   const [names, setNames] = useState<Record<string, string>>({});
@@ -208,7 +213,7 @@ export default function CoachMeetings() {
                   onPress={() => confirmDelete(slot)}
                   style={({ pressed }) => [styles.rowAction, pressed && styles.pressed]}
                 >
-                  <Ionicons name="trash-outline" size={16} color={colors.danger} />
+                  <Ionicons name="trash-outline" size={16} color={c.danger} />
                   <Text style={styles.rowActionText}>Delete</Text>
                 </Pressable>
               </Card>
@@ -232,7 +237,7 @@ export default function CoachMeetings() {
                     onPress={() => confirmDelete(slot)}
                     hitSlop={8}
                   >
-                    <Ionicons name="trash-outline" size={17} color={colors.danger} />
+                    <Ionicons name="trash-outline" size={17} color={c.danger} />
                   </Pressable>
                 </View>
                 <Text style={styles.meta}>
@@ -248,18 +253,19 @@ export default function CoachMeetings() {
   );
 }
 
-const styles = StyleSheet.create({
-  cardTitle: { ...type.heading, color: colors.text },
+const makeStyles = (c: Palette) =>
+  StyleSheet.create({
+  cardTitle: { ...type.heading, color: c.text },
   fields: { gap: spacing.lg, marginTop: spacing.lg },
   submit: { marginTop: spacing.lg },
-  error: { ...type.caption, color: colors.danger, marginTop: spacing.md },
+  error: { ...type.caption, color: c.danger, marginTop: spacing.md },
   head: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.md },
   headText: { flex: 1 },
-  day: { ...type.overline, color: colors.textFaint },
-  time: { ...type.title, color: colors.primary, marginTop: 2 },
-  who: { ...type.bodyStrong, color: colors.text, marginTop: spacing.sm },
-  meta: { ...type.caption, color: colors.textMuted, marginTop: spacing.xs },
-  topic: { ...type.body, color: colors.textMuted, fontStyle: 'italic', marginTop: spacing.sm },
+  day: { ...type.overline, color: c.textFaint },
+  time: { ...type.title, color: c.primary, marginTop: 2 },
+  who: { ...type.bodyStrong, color: c.text, marginTop: spacing.sm },
+  meta: { ...type.caption, color: c.textMuted, marginTop: spacing.xs },
+  topic: { ...type.body, color: c.textMuted, fontStyle: 'italic', marginTop: spacing.sm },
   rowAction: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -267,8 +273,8 @@ const styles = StyleSheet.create({
     marginTop: spacing.md,
     paddingTop: spacing.md,
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.border,
+    borderTopColor: c.border,
   },
-  rowActionText: { ...type.label, color: colors.danger },
+  rowActionText: { ...type.label, color: c.danger },
   pressed: { opacity: 0.7 },
 });

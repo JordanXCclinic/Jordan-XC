@@ -9,15 +9,20 @@ import { Card } from '../../../../components/Card';
 import { EmptyState, LoadingState, Screen, SectionHeader } from '../../../../components/Screen';
 import { formatDate, formatDuration, formatMiles, roleLabel } from '../../../../lib/format';
 import { isSupabaseConfigured, supabase } from '../../../../lib/supabase';
-import {
-  PROFILE_COLUMNS,
+import { PROFILE_COLUMNS,
   WORKOUT_LOG_COLUMNS,
   type Profile,
   type WorkoutLog,
 } from '../../../../lib/types';
-import { colors, spacing, type } from '../../../../lib/theme';
+import { spacing, type, type Palette } from '../../../../lib/theme';
+import { useTheme, useThemedStyles } from '../../../../lib/appearance';
 
 export default function AthleteDetail() {
+
+  const c = useTheme();
+
+  const styles = useThemedStyles(makeStyles);
+
   const { id } = useLocalSearchParams<{ id: string }>();
   const [athlete, setAthlete] = useState<Profile | null>(null);
   const [guardians, setGuardians] = useState<Profile[]>([]);
@@ -145,7 +150,7 @@ export default function AthleteDetail() {
             onPress={() => void Linking.openURL(`tel:${athlete.phone}`)}
             style={({ pressed }) => [styles.call, pressed && styles.pressed]}
           >
-            <Ionicons name="call" size={16} color={colors.primary} />
+            <Ionicons name="call" size={16} color={c.primary} />
             <Text style={styles.callText}>{athlete.phone}</Text>
           </Pressable>
         ) : null}
@@ -186,7 +191,7 @@ export default function AthleteDetail() {
                 onPress={() => void Linking.openURL(`tel:${guardian.phone}`)}
                 style={({ pressed }) => [styles.call, pressed && styles.pressed]}
               >
-                <Ionicons name="call" size={16} color={colors.primary} />
+                <Ionicons name="call" size={16} color={c.primary} />
                 <Text style={styles.callText}>{guardian.phone}</Text>
               </Pressable>
             ) : null}
@@ -232,20 +237,21 @@ export default function AthleteDetail() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (c: Palette) =>
+  StyleSheet.create({
   identity: { flexDirection: 'row', alignItems: 'center', gap: spacing.lg },
   identityText: { flex: 1, gap: spacing.sm },
-  name: { ...type.title, color: colors.text },
+  name: { ...type.title, color: c.text },
   call: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.md },
-  callText: { ...type.bodyStrong, color: colors.primary },
+  callText: { ...type.bodyStrong, color: c.primary },
   pressed: { opacity: 0.7 },
-  edit: { ...type.label, color: colors.primary },
-  guardianName: { ...type.bodyStrong, color: colors.text },
-  planName: { ...type.heading, color: colors.text },
-  meta: { ...type.caption, color: colors.textMuted, marginTop: spacing.xs },
+  edit: { ...type.label, color: c.primary },
+  guardianName: { ...type.bodyStrong, color: c.text },
+  planName: { ...type.heading, color: c.text },
+  meta: { ...type.caption, color: c.textMuted, marginTop: spacing.xs },
   logHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  logDate: { ...type.bodyStrong, color: colors.text },
-  logStats: { ...type.body, color: colors.primary, marginTop: spacing.xs },
-  logNotes: { ...type.body, color: colors.textMuted, marginTop: spacing.xs },
-  logBy: { ...type.caption, color: colors.textFaint, marginTop: spacing.sm, fontStyle: 'italic' },
+  logDate: { ...type.bodyStrong, color: c.text },
+  logStats: { ...type.body, color: c.primary, marginTop: spacing.xs },
+  logNotes: { ...type.body, color: c.textMuted, marginTop: spacing.xs },
+  logBy: { ...type.caption, color: c.textFaint, marginTop: spacing.sm, fontStyle: 'italic' },
 });

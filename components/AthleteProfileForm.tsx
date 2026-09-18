@@ -8,15 +8,15 @@ import { LoadingState } from './Screen';
 import { useAuth } from '../lib/auth';
 import { firstName, formatDuration, parseDuration } from '../lib/format';
 import { isSupabaseConfigured, supabase } from '../lib/supabase';
-import {
-  ATHLETE_PROFILE_COLUMNS,
+import { ATHLETE_PROFILE_COLUMNS,
   GRADES,
   PB_EVENTS,
   PERSONAL_BEST_COLUMNS,
   type AthleteProfile,
   type PersonalBest,
 } from '../lib/types';
-import { colors, spacing, type } from '../lib/theme';
+import { spacing, type, type Palette } from '../lib/theme';
+import { useTheme, useThemedStyles } from '../lib/appearance';
 
 type Props = {
   athleteId: string;
@@ -52,6 +52,9 @@ const GRADE_OPTIONS = GRADES.map((grade) => ({ value: grade, label: grade }));
  * so an edit later cannot drift from what was collected at setup.
  */
 export function AthleteProfileForm({ athleteId, athleteName, submitLabel, onSaved }: Props) {
+  const c = useTheme();
+  const styles = useThemedStyles(makeStyles);
+
   const { profile } = useAuth();
   // The same form is filled in by the athlete, a parent, and a coach, so it
   // addresses whoever is actually holding the phone.
@@ -237,7 +240,7 @@ export function AthleteProfileForm({ athleteId, athleteName, submitLabel, onSave
 
       <Card accent="primary">
         <View style={styles.privateHeading}>
-          <Ionicons name="lock-closed" size={16} color={colors.primary} />
+          <Ionicons name="lock-closed" size={16} color={c.primary} />
           <Text style={styles.cardTitle}>Emergency contact</Text>
         </View>
         <Text style={styles.cardHint}>
@@ -277,10 +280,11 @@ export function AthleteProfileForm({ athleteId, athleteName, submitLabel, onSave
   );
 }
 
-const styles = StyleSheet.create({
-  cardTitle: { ...type.heading, color: colors.text },
-  cardHint: { ...type.caption, color: colors.textMuted, marginTop: spacing.xs, lineHeight: 17 },
+const makeStyles = (c: Palette) =>
+  StyleSheet.create({
+  cardTitle: { ...type.heading, color: c.text },
+  cardHint: { ...type.caption, color: c.textMuted, marginTop: spacing.xs, lineHeight: 17 },
   fields: { gap: spacing.lg, marginTop: spacing.lg },
   privateHeading: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  error: { ...type.body, color: colors.danger },
+  error: { ...type.body, color: c.danger },
 });

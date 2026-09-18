@@ -1,18 +1,26 @@
 import { StyleSheet, Text, View } from 'react-native';
-import { colors, radius, spacing, type } from '../lib/theme';
+import { radius, spacing, type, type Palette } from '../lib/theme';
+import { useTheme, useThemedStyles } from '../lib/appearance';
 
 export type Tone = 'neutral' | 'primary' | 'success' | 'warning' | 'danger';
 
-const TONES: Record<Tone, { bg: string; ink: string }> = {
-  neutral: { bg: colors.surfaceSunken, ink: colors.textMuted },
-  primary: { bg: colors.primaryTint, ink: colors.primary },
-  success: { bg: colors.successTint, ink: colors.success },
-  warning: { bg: colors.warningTint, ink: colors.warning },
-  danger: { bg: colors.dangerTint, ink: colors.danger },
-};
+// A function of the palette rather than a constant: the pairings are the same
+// in both themes, the colours behind them are not.
+const tones = (c: Palette): Record<Tone, { bg: string; ink: string }> => ({
+  neutral: { bg: c.surfaceSunken, ink: c.textMuted },
+  primary: { bg: c.primaryTint, ink: c.primary },
+  success: { bg: c.successTint, ink: c.success },
+  warning: { bg: c.warningTint, ink: c.warning },
+  danger: { bg: c.dangerTint, ink: c.danger },
+});
 
 export function Badge({ label, tone = 'neutral' }: { label: string; tone?: Tone }) {
-  const { bg, ink } = TONES[tone];
+
+  const c = useTheme();
+
+  const styles = useThemedStyles(makeStyles);
+
+  const { bg, ink } = tones(c)[tone];
   return (
     <View style={[styles.badge, { backgroundColor: bg }]}>
       <Text style={[styles.text, { color: ink }]}>{label}</Text>
@@ -20,7 +28,8 @@ export function Badge({ label, tone = 'neutral' }: { label: string; tone?: Tone 
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (c: Palette) =>
+  StyleSheet.create({
   badge: {
     alignSelf: 'flex-start',
     paddingHorizontal: spacing.sm,

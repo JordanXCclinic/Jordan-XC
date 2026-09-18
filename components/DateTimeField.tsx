@@ -5,7 +5,8 @@ import { Modal, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'r
 import { Ionicons } from '@expo/vector-icons';
 import { Button } from './Button';
 import { formatDateTime, parseLocalDateTime, toDateInput, toTimeInput } from '../lib/format';
-import { colors, radius, spacing, type } from '../lib/theme';
+import { radius, spacing, type, type Palette } from '../lib/theme';
+import { useTheme, useThemedStyles } from '../lib/appearance';
 
 type Props = {
   label: string;
@@ -21,6 +22,9 @@ type Props = {
  * native picker has no implementation — falls back to typed fields.
  */
 export function DateTimeField({ label, value, onChange, hint, minimumDate }: Props) {
+  const c = useTheme();
+  const styles = useThemedStyles(makeStyles);
+
   const [sheetOpen, setSheetOpen] = useState(false);
   const [draft, setDraft] = useState(value);
 
@@ -67,9 +71,9 @@ export function DateTimeField({ label, value, onChange, hint, minimumDate }: Pro
         onPress={open}
         style={({ pressed }) => [styles.trigger, pressed && styles.pressed]}
       >
-        <Ionicons name="calendar-outline" size={18} color={colors.primary} />
+        <Ionicons name="calendar-outline" size={18} color={c.primary} />
         <Text style={styles.triggerText}>{formatDateTime(value)}</Text>
-        <Ionicons name="chevron-down" size={16} color={colors.textFaint} />
+        <Ionicons name="chevron-down" size={16} color={c.textFaint} />
       </Pressable>
       {hint ? <Text style={styles.hint}>{hint}</Text> : null}
 
@@ -104,6 +108,11 @@ export function DateTimeField({ label, value, onChange, hint, minimumDate }: Pro
 }
 
 function WebDateTime({ label, value, onChange, hint }: Omit<Props, 'minimumDate'>) {
+
+  const c = useTheme();
+
+  const styles = useThemedStyles(makeStyles);
+
   const [date, setDate] = useState(toDateInput(value));
   const [time, setTime] = useState(toTimeInput(value));
 
@@ -123,7 +132,7 @@ function WebDateTime({ label, value, onChange, hint }: Omit<Props, 'minimumDate'
           value={date}
           onChangeText={(next) => commit(next, time)}
           placeholder="YYYY-MM-DD"
-          placeholderTextColor={colors.textFaint}
+          placeholderTextColor={c.textFaint}
           accessibilityLabel={`${label} date`}
         />
         <TextInput
@@ -131,7 +140,7 @@ function WebDateTime({ label, value, onChange, hint }: Omit<Props, 'minimumDate'
           value={time}
           onChangeText={(next) => commit(date, next)}
           placeholder="HH:MM"
-          placeholderTextColor={colors.textFaint}
+          placeholderTextColor={c.textFaint}
           accessibilityLabel={`${label} time`}
         />
       </View>
@@ -140,44 +149,45 @@ function WebDateTime({ label, value, onChange, hint }: Omit<Props, 'minimumDate'
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (c: Palette) =>
+  StyleSheet.create({
   field: { gap: spacing.sm },
-  label: { ...type.label, color: colors.text },
+  label: { ...type.label, color: c.text },
   trigger: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.md,
     borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
+    borderColor: c.border,
+    backgroundColor: c.surface,
     borderRadius: radius.md,
     paddingHorizontal: spacing.lg,
     minHeight: 46,
   },
   pressed: { opacity: 0.85 },
-  triggerText: { ...type.body, color: colors.text, flex: 1 },
-  hint: { ...type.caption, color: colors.textFaint },
-  backdrop: { flex: 1, backgroundColor: colors.overlay },
+  triggerText: { ...type.body, color: c.text, flex: 1 },
+  hint: { ...type.caption, color: c.textFaint },
+  backdrop: { flex: 1, backgroundColor: c.overlay },
   sheet: {
-    backgroundColor: colors.background,
+    backgroundColor: c.background,
     borderTopLeftRadius: radius.xl,
     borderTopRightRadius: radius.xl,
     padding: spacing.xl,
     paddingBottom: spacing.xxl,
     gap: spacing.md,
   },
-  sheetTitle: { ...type.heading, color: colors.text, textAlign: 'center' },
+  sheetTitle: { ...type.heading, color: c.text, textAlign: 'center' },
   sheetActions: { flexDirection: 'row', gap: spacing.md },
   sheetButton: { flex: 1 },
   input: {
     borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
+    borderColor: c.border,
+    backgroundColor: c.surface,
     borderRadius: radius.md,
     paddingHorizontal: spacing.lg,
     minHeight: 46,
     ...type.body,
-    color: colors.text,
+    color: c.text,
   },
   webRow: { flexDirection: 'row', gap: spacing.md },
   // minWidth 0 lets these shrink inside the row. Without it the inputs keep

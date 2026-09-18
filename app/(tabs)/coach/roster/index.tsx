@@ -7,9 +7,15 @@ import { TextField } from '../../../../components/Field';
 import { EmptyState, LoadingState, Screen } from '../../../../components/Screen';
 import { isSupabaseConfigured, supabase } from '../../../../lib/supabase';
 import { PROFILE_COLUMNS, type Profile } from '../../../../lib/types';
-import { colors, radius, shadow, spacing, type } from '../../../../lib/theme';
+import { radius, shadow, spacing, type, type Palette } from '../../../../lib/theme';
+import { useTheme, useThemedStyles } from '../../../../lib/appearance';
 
 export default function Roster() {
+
+  const c = useTheme();
+
+  const styles = useThemedStyles(makeStyles);
+
   const [athletes, setAthletes] = useState<Profile[]>([]);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
@@ -99,20 +105,21 @@ export default function Roster() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (c: Palette) =>
+  StyleSheet.create({
   row: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.md,
-    backgroundColor: colors.background,
+    backgroundColor: c.background,
     borderRadius: radius.lg,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: c.border,
     padding: spacing.md,
     ...shadow.card,
   },
   pressed: { opacity: 0.9 },
   text: { flex: 1 },
-  name: { ...type.bodyStrong, color: colors.text },
-  meta: { ...type.caption, color: colors.textMuted },
+  name: { ...type.bodyStrong, color: c.text },
+  meta: { ...type.caption, color: c.textMuted },
 });

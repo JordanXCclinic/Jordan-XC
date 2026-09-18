@@ -8,7 +8,8 @@ import { SegmentedControl } from '../../components/SegmentedControl';
 import { formatDayHeading, formatTime } from '../../lib/format';
 import { isSupabaseConfigured, supabase } from '../../lib/supabase';
 import { PRACTICE_COLUMNS, type Practice } from '../../lib/types';
-import { colors, spacing, type } from '../../lib/theme';
+import { spacing, type, type Palette } from '../../lib/theme';
+import { useTheme, useThemedStyles } from '../../lib/appearance';
 
 type Range = 'upcoming' | 'past';
 
@@ -19,6 +20,11 @@ const STATUS: Record<Practice['status'], { label: string; tone: Tone } | null> =
 };
 
 export default function Schedule() {
+
+  const c = useTheme();
+
+  const styles = useThemedStyles(makeStyles);
+
   const [range, setRange] = useState<Range>('upcoming');
   const [practices, setPractices] = useState<Practice[]>([]);
   const [loading, setLoading] = useState(true);
@@ -109,14 +115,14 @@ export default function Schedule() {
 
                   {practice.meeting_point ? (
                     <View style={styles.detailRow}>
-                      <Ionicons name="navigate-outline" size={15} color={colors.textFaint} />
+                      <Ionicons name="navigate-outline" size={15} color={c.textFaint} />
                       <Text style={styles.detail}>Meet at {practice.meeting_point}</Text>
                     </View>
                   ) : null}
 
                   {practice.notes ? (
                     <View style={styles.detailRow}>
-                      <Ionicons name="information-circle-outline" size={15} color={colors.textFaint} />
+                      <Ionicons name="information-circle-outline" size={15} color={c.textFaint} />
                       <Text style={styles.detail}>{practice.notes}</Text>
                     </View>
                   ) : null}
@@ -130,13 +136,14 @@ export default function Schedule() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (c: Palette) =>
+  StyleSheet.create({
   group: { gap: spacing.md, marginTop: spacing.sm },
-  day: { ...type.overline, color: colors.textFaint },
+  day: { ...type.overline, color: c.textFaint },
   head: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.md },
-  time: { ...type.heading, color: colors.primary },
-  struck: { textDecorationLine: 'line-through', color: colors.textFaint },
-  location: { ...type.bodyStrong, color: colors.text, marginTop: spacing.xs },
+  time: { ...type.heading, color: c.primary },
+  struck: { textDecorationLine: 'line-through', color: c.textFaint },
+  location: { ...type.bodyStrong, color: c.text, marginTop: spacing.xs },
   detailRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm, alignItems: 'flex-start' },
-  detail: { ...type.body, color: colors.textMuted, flex: 1 },
+  detail: { ...type.body, color: c.textMuted, flex: 1 },
 });

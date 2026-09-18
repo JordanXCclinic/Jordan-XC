@@ -11,15 +11,15 @@ import { EmptyState, LoadingState, Screen, SectionHeader } from '../../../../com
 import { useAuth } from '../../../../lib/auth';
 import { PLAN_DAYS, formatMiles, planDayLabel, toDateInput } from '../../../../lib/format';
 import { isSupabaseConfigured, supabase } from '../../../../lib/supabase';
-import {
-  PROFILE_COLUMNS,
+import { PROFILE_COLUMNS,
   TRAINING_PLAN_COLUMNS,
   WORKOUT_COLUMNS,
   type Profile,
   type TrainingPlan,
   type Workout,
 } from '../../../../lib/types';
-import { colors, radius, spacing, type } from '../../../../lib/theme';
+import { radius, spacing, type, type Palette } from '../../../../lib/theme';
+import { useTheme, useThemedStyles } from '../../../../lib/appearance';
 
 const DAY_OPTIONS = PLAN_DAYS.map((label, index) => ({ value: String(index + 1), label }));
 
@@ -33,6 +33,11 @@ function nextMonday(): Date {
 }
 
 export default function PlanEditor() {
+
+  const c = useTheme();
+
+  const styles = useThemedStyles(makeStyles);
+
   const { id } = useLocalSearchParams<{ id: string }>();
   const { profile } = useAuth();
 
@@ -293,14 +298,14 @@ export default function PlanEditor() {
             <View style={styles.head}>
               <Text style={styles.day}>{planDayLabel(workout.day_of_week)}</Text>
               <View style={styles.cardActions}>
-                <Ionicons name="create-outline" size={16} color={colors.textFaint} />
+                <Ionicons name="create-outline" size={16} color={c.textFaint} />
                 <Pressable
                   accessibilityRole="button"
                   accessibilityLabel={`Delete ${workout.title}`}
                   onPress={() => void removeWorkout(workout)}
                   hitSlop={8}
                 >
-                  <Ionicons name="trash-outline" size={17} color={colors.danger} />
+                  <Ionicons name="trash-outline" size={17} color={c.danger} />
                 </Pressable>
               </View>
             </View>
@@ -341,8 +346,8 @@ export default function PlanEditor() {
             <Switch
               value={assigned.has(athlete.id)}
               onValueChange={(next) => void toggleAssignment(athlete, next)}
-              trackColor={{ true: colors.primary, false: colors.borderStrong }}
-              thumbColor={colors.background}
+              trackColor={{ true: c.primary, false: c.borderStrong }}
+              thumbColor={c.background}
               accessibilityLabel={`Assign ${plan.name} to ${athlete.full_name}`}
             />
           </View>
@@ -352,45 +357,46 @@ export default function PlanEditor() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (c: Palette) =>
+  StyleSheet.create({
   weeks: { gap: spacing.sm, paddingVertical: spacing.xs },
   weekChip: {
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.sm,
     borderRadius: radius.pill,
     borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
+    borderColor: c.border,
+    backgroundColor: c.surface,
   },
-  weekChipSelected: { backgroundColor: colors.primary, borderColor: colors.primary },
-  weekText: { ...type.label, color: colors.textMuted },
-  weekTextSelected: { color: colors.textInverse },
-  cardTitle: { ...type.heading, color: colors.text },
+  weekChipSelected: { backgroundColor: c.primarySurface, borderColor: c.primary },
+  weekText: { ...type.label, color: c.textMuted },
+  weekTextSelected: { color: c.textInverse },
+  cardTitle: { ...type.heading, color: c.text },
   fields: { gap: spacing.lg, marginTop: spacing.lg },
   row: { flexDirection: 'row', gap: spacing.md },
   half: { flex: 1 },
   submit: { marginTop: spacing.lg },
   cancel: { marginTop: spacing.sm },
   cardActions: { flexDirection: 'row', alignItems: 'center', gap: spacing.lg },
-  error: { ...type.caption, color: colors.danger, marginTop: spacing.md },
+  error: { ...type.caption, color: c.danger, marginTop: spacing.md },
   head: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  day: { ...type.overline, color: colors.textFaint },
-  workoutTitle: { ...type.heading, color: colors.text, marginTop: spacing.xs },
+  day: { ...type.overline, color: c.textFaint },
+  workoutTitle: { ...type.heading, color: c.text, marginTop: spacing.xs },
   metaRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm, flexWrap: 'wrap' },
-  body: { ...type.body, color: colors.textMuted, marginTop: spacing.sm },
+  body: { ...type.body, color: c.textMuted, marginTop: spacing.sm },
   assignRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: colors.background,
+    backgroundColor: c.background,
     borderRadius: radius.lg,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: c.border,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
     gap: spacing.md,
   },
   assignText: { flex: 1 },
-  assignName: { ...type.bodyStrong, color: colors.text },
-  assignMeta: { ...type.caption, color: colors.textMuted },
+  assignName: { ...type.bodyStrong, color: c.text },
+  assignMeta: { ...type.caption, color: c.textMuted },
 });

@@ -11,17 +11,22 @@ import { useAuth } from '../../lib/auth';
 import { firstName, formatMiles, planDayLabel } from '../../lib/format';
 import { isSupabaseConfigured, supabase } from '../../lib/supabase';
 import { currentWeekNumber, planDayToday } from '../../lib/training';
-import {
-  TRAINING_PLAN_COLUMNS,
+import { TRAINING_PLAN_COLUMNS,
   WORKOUT_COLUMNS,
   isAthlete,
   isParent,
   type TrainingPlan,
   type Workout,
 } from '../../lib/types';
-import { colors, radius, spacing, type } from '../../lib/theme';
+import { radius, spacing, type, type Palette } from '../../lib/theme';
+import { useTheme, useThemedStyles } from '../../lib/appearance';
 
 export default function Training() {
+
+  const c = useTheme();
+
+  const styles = useThemedStyles(makeStyles);
+
   const { profile, role } = useAuth();
   const { athletes, activeAthleteId, setActiveAthleteId, activeAthlete } = useAthlete();
 
@@ -205,7 +210,7 @@ export default function Training() {
                       <Ionicons
                         name={logged ? 'add-circle-outline' : 'checkmark-circle-outline'}
                         size={17}
-                        color={colors.primary}
+                        color={c.primary}
                       />
                       <Text style={styles.logText}>
                         {logged
@@ -238,27 +243,28 @@ export default function Training() {
   );
 }
 
-const styles = StyleSheet.create({
-  planName: { ...type.heading, color: colors.text },
-  planDesc: { ...type.body, color: colors.textMuted, marginTop: spacing.xs },
+const makeStyles = (c: Palette) =>
+  StyleSheet.create({
+  planName: { ...type.heading, color: c.text },
+  planDesc: { ...type.body, color: c.textMuted, marginTop: spacing.xs },
   weeks: { gap: spacing.sm, paddingVertical: spacing.xs },
   weekChip: {
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.sm,
     borderRadius: radius.pill,
     borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
+    borderColor: c.border,
+    backgroundColor: c.surface,
   },
-  weekChipSelected: { backgroundColor: colors.primary, borderColor: colors.primary },
-  weekText: { ...type.label, color: colors.textMuted },
-  weekTextSelected: { color: colors.textInverse },
+  weekChipSelected: { backgroundColor: c.primarySurface, borderColor: c.primary },
+  weekText: { ...type.label, color: c.textMuted },
+  weekTextSelected: { color: c.textInverse },
   head: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  day: { ...type.overline, color: colors.textFaint },
-  dayToday: { color: colors.primary },
-  title: { ...type.heading, color: colors.text, marginTop: spacing.xs },
+  day: { ...type.overline, color: c.textFaint },
+  dayToday: { color: c.primary },
+  title: { ...type.heading, color: c.text, marginTop: spacing.xs },
   metaRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm, flexWrap: 'wrap' },
-  body: { ...type.body, color: colors.textMuted, marginTop: spacing.sm },
+  body: { ...type.body, color: c.textMuted, marginTop: spacing.sm },
   logButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -266,8 +272,8 @@ const styles = StyleSheet.create({
     marginTop: spacing.lg,
     paddingTop: spacing.md,
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.border,
+    borderTopColor: c.border,
   },
   pressed: { opacity: 0.7 },
-  logText: { ...type.label, color: colors.primary },
+  logText: { ...type.label, color: c.primary },
 });

@@ -1,8 +1,7 @@
 import { useState } from 'react';
 import * as WebBrowser from 'expo-web-browser';
 import { Ionicons } from '@expo/vector-icons';
-import {
-  ActivityIndicator,
+import { ActivityIndicator,
   Platform,
   Pressable,
   ScrollView,
@@ -14,7 +13,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Logo } from '../components/Logo';
 import { isSupabaseConfigured } from '../lib/supabase';
 import { signInWithProvider, type OAuthProvider } from '../lib/oauth';
-import { brand, colors, radius, shadow, spacing, type } from '../lib/theme';
+import { brand, radius, shadow, spacing, type, type Palette } from '../lib/theme';
+import { useTheme, useThemedStyles } from '../lib/appearance';
 
 export const CLINIC_URL = 'https://jordanxcclinic.com/';
 
@@ -38,6 +38,11 @@ const PROVIDER_STYLE: Record<
 };
 
 export default function SignIn() {
+
+  const c = useTheme();
+
+  const styles = useThemedStyles(makeStyles);
+
   const insets = useSafeAreaInsets();
   const [busy, setBusy] = useState<OAuthProvider | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -70,7 +75,7 @@ export default function SignIn() {
       <View style={styles.actions}>
         {!isSupabaseConfigured ? (
           <View style={styles.notice}>
-            <Ionicons name="construct-outline" size={18} color={colors.textInverse} />
+            <Ionicons name="construct-outline" size={18} color={c.textInverse} />
             <Text style={styles.noticeText}>
               Backend not connected yet. Add EXPO_PUBLIC_SUPABASE_URL and
               EXPO_PUBLIC_SUPABASE_ANON_KEY to .env, then enable the Apple and Google
@@ -112,7 +117,7 @@ export default function SignIn() {
 
         {error ? (
           <View style={styles.error}>
-            <Ionicons name="alert-circle" size={18} color={colors.textInverse} />
+            <Ionicons name="alert-circle" size={18} color={c.textInverse} />
             <Text style={styles.errorText}>{error}</Text>
           </View>
         ) : null}
@@ -130,26 +135,27 @@ export default function SignIn() {
         <Text style={styles.footerText}>
           Not registered yet? Sign up at <Text style={styles.footerStrong}>jordanxcclinic.com</Text>
         </Text>
-        <Ionicons name="open-outline" size={15} color={colors.textOnPrimary} />
+        <Ionicons name="open-outline" size={15} color={c.textOnPrimary} />
       </Pressable>
     </ScrollView>
   );
 }
 
-const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.primary },
+const makeStyles = (c: Palette) =>
+  StyleSheet.create({
+  root: { flex: 1, backgroundColor: c.primarySurface },
   content: { flexGrow: 1, paddingHorizontal: spacing.xl, justifyContent: 'space-between', gap: spacing.xxl },
   brandBlock: { alignItems: 'center', gap: spacing.lg, paddingTop: spacing.xl },
   title: {
     ...type.display,
-    color: colors.textInverse,
+    color: c.textInverse,
     textAlign: 'center',
     fontSize: 27,
     lineHeight: 33,
   },
   tagline: {
     ...type.body,
-    color: colors.textOnPrimary,
+    color: c.textOnPrimary,
     textAlign: 'center',
     maxWidth: 320,
   },
@@ -174,18 +180,18 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     padding: spacing.lg,
   },
-  noticeText: { ...type.caption, color: colors.textInverse, flex: 1, lineHeight: 18 },
+  noticeText: { ...type.caption, color: c.textInverse, flex: 1, lineHeight: 18 },
   error: {
     flexDirection: 'row',
     gap: spacing.sm,
     alignItems: 'center',
-    backgroundColor: colors.accent,
+    backgroundColor: c.accent,
     borderRadius: radius.md,
     padding: spacing.md,
   },
-  errorText: { ...type.caption, color: colors.textInverse, flex: 1 },
-  help: { ...type.caption, color: colors.textOnPrimary, textAlign: 'center', lineHeight: 18 },
+  errorText: { ...type.caption, color: c.textInverse, flex: 1 },
+  help: { ...type.caption, color: c.textOnPrimary, textAlign: 'center', lineHeight: 18 },
   footerLink: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm },
-  footerText: { ...type.caption, color: colors.textOnPrimary },
-  footerStrong: { color: colors.textInverse, fontWeight: '700' },
+  footerText: { ...type.caption, color: c.textOnPrimary },
+  footerStrong: { color: c.textInverse, fontWeight: '700' },
 });

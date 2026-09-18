@@ -5,13 +5,13 @@ import { Card } from './Card';
 import { EmptyState, LoadingState } from './Screen';
 import { formatDuration } from '../lib/format';
 import { isSupabaseConfigured, supabase } from '../lib/supabase';
-import {
-  PERSONAL_BEST_COLUMNS,
+import { PERSONAL_BEST_COLUMNS,
   PB_EVENTS,
   type AthleteProfile,
   type PersonalBest,
 } from '../lib/types';
-import { colors, radius, spacing, type } from '../lib/theme';
+import { radius, spacing, type, type Palette } from '../lib/theme';
+import { useTheme, useThemedStyles } from '../lib/appearance';
 
 /**
  * Read-only view of an athlete's intake form. Shared by the Profile tab and the
@@ -19,6 +19,9 @@ import { colors, radius, spacing, type } from '../lib/theme';
  * family is.
  */
 export function AthleteSummary({ athleteId }: { athleteId: string }) {
+  const c = useTheme();
+  const styles = useThemedStyles(makeStyles);
+
   const [profile, setProfile] = useState<AthleteProfile | null>(null);
   const [bests, setBests] = useState<PersonalBest[]>([]);
   const [loading, setLoading] = useState(true);
@@ -97,7 +100,7 @@ export function AthleteSummary({ athleteId }: { athleteId: string }) {
       {profile?.emergency_contact_name ? (
         <Card accent="primary">
           <View style={styles.privateHead}>
-            <Ionicons name="lock-closed" size={15} color={colors.primary} />
+            <Ionicons name="lock-closed" size={15} color={c.primary} />
             <Text style={styles.cardTitle}>Emergency contact</Text>
           </View>
           <Text style={styles.contactName}>{profile.emergency_contact_name}</Text>
@@ -111,7 +114,7 @@ export function AthleteSummary({ athleteId }: { athleteId: string }) {
               onPress={() => void Linking.openURL(`tel:${profile.emergency_contact_phone}`)}
               style={({ pressed }) => [styles.call, pressed && styles.pressed]}
             >
-              <Ionicons name="call" size={16} color={colors.primary} />
+              <Ionicons name="call" size={16} color={c.primary} />
               <Text style={styles.callText}>{profile.emergency_contact_phone}</Text>
             </Pressable>
           ) : null}
@@ -122,6 +125,11 @@ export function AthleteSummary({ athleteId }: { athleteId: string }) {
 }
 
 function Fact({ label, value }: { label: string; value: string }) {
+
+  const c = useTheme();
+
+  const styles = useThemedStyles(makeStyles);
+
   return (
     <View style={styles.fact}>
       <Text style={styles.factLabel}>{label}</Text>
@@ -130,30 +138,31 @@ function Fact({ label, value }: { label: string; value: string }) {
   );
 }
 
-const styles = StyleSheet.create({
-  cardTitle: { ...type.heading, color: colors.text },
-  body: { ...type.body, color: colors.textMuted },
+const makeStyles = (c: Palette) =>
+  StyleSheet.create({
+  cardTitle: { ...type.heading, color: c.text },
+  body: { ...type.body, color: c.textMuted },
   facts: { gap: spacing.md, marginTop: spacing.md },
   fact: { gap: 2 },
-  factLabel: { ...type.caption, color: colors.textFaint },
-  factValue: { ...type.body, color: colors.text },
+  factLabel: { ...type.caption, color: c.textFaint },
+  factValue: { ...type.body, color: c.text },
   pbGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginTop: spacing.md },
   pb: {
-    backgroundColor: colors.surface,
+    backgroundColor: c.surface,
     borderRadius: radius.md,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
     minWidth: 92,
     gap: 2,
   },
-  pbEvent: { ...type.caption, color: colors.textFaint },
-  pbTime: { ...type.heading, color: colors.primary },
+  pbEvent: { ...type.caption, color: c.textFaint },
+  pbTime: { ...type.heading, color: c.primary },
   privateHead: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   block: { marginTop: spacing.md, gap: 2 },
-  blockLabel: { ...type.caption, color: colors.textFaint },
-  contactName: { ...type.bodyStrong, color: colors.text, marginTop: spacing.sm },
-  contactMeta: { ...type.caption, color: colors.textMuted },
+  blockLabel: { ...type.caption, color: c.textFaint },
+  contactName: { ...type.bodyStrong, color: c.text, marginTop: spacing.sm },
+  contactMeta: { ...type.caption, color: c.textMuted },
   call: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.md },
   pressed: { opacity: 0.7 },
-  callText: { ...type.bodyStrong, color: colors.primary },
+  callText: { ...type.bodyStrong, color: c.primary },
 });

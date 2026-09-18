@@ -2,8 +2,7 @@ import { useState } from 'react';
 import { router } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import { Ionicons } from '@expo/vector-icons';
-import {
-  KeyboardAvoidingView,
+import { KeyboardAvoidingView,
   Platform,
   Pressable,
   ScrollView,
@@ -17,10 +16,16 @@ import { Button } from '../components/Button';
 import { Logo } from '../components/Logo';
 import { useAuth } from '../lib/auth';
 import { supabase } from '../lib/supabase';
-import { colors, radius, shadow, spacing, type } from '../lib/theme';
+import { radius, shadow, spacing, type, type Palette } from '../lib/theme';
 import { CLINIC_URL } from './sign-in';
+import { useTheme, useThemedStyles } from '../lib/appearance';
 
 export default function Onboarding() {
+
+  const c = useTheme();
+
+  const styles = useThemedStyles(makeStyles);
+
   const insets = useSafeAreaInsets();
   const { refreshProfile, signOut } = useAuth();
   const [code, setCode] = useState('');
@@ -70,7 +75,7 @@ export default function Onboarding() {
           <TextInput
             style={[styles.input, Boolean(error) && styles.inputError]}
             placeholder="ABCDEFGHJK"
-            placeholderTextColor={colors.textFaint}
+            placeholderTextColor={c.textFaint}
             autoCapitalize="characters"
             autoCorrect={false}
             autoComplete="off"
@@ -90,7 +95,7 @@ export default function Onboarding() {
 
           {error ? (
             <View style={styles.error}>
-              <Ionicons name="alert-circle" size={18} color={colors.danger} />
+              <Ionicons name="alert-circle" size={18} color={c.danger} />
               <Text style={styles.errorText}>{error}</Text>
             </View>
           ) : null}
@@ -110,7 +115,7 @@ export default function Onboarding() {
             style={styles.linkRow}
           >
             <Text style={styles.link}>No code yet? Register at jordanxcclinic.com</Text>
-            <Ionicons name="open-outline" size={15} color={colors.primary} />
+            <Ionicons name="open-outline" size={15} color={c.primary} />
           </Pressable>
         </View>
 
@@ -122,22 +127,23 @@ export default function Onboarding() {
   );
 }
 
-const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.primary },
+const makeStyles = (c: Palette) =>
+  StyleSheet.create({
+  root: { flex: 1, backgroundColor: c.primarySurface },
   content: { flexGrow: 1, justifyContent: 'center', paddingHorizontal: spacing.lg, gap: spacing.xl },
   card: {
-    backgroundColor: colors.background,
+    backgroundColor: c.background,
     borderRadius: radius.xl,
     padding: spacing.xl,
     gap: spacing.lg,
     ...shadow.raised,
   },
-  title: { ...type.title, color: colors.text },
-  subtitle: { ...type.body, color: colors.textMuted },
+  title: { ...type.title, color: c.text },
+  subtitle: { ...type.body, color: c.textMuted },
   input: {
     borderWidth: 2,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
+    borderColor: c.border,
+    backgroundColor: c.surface,
     borderRadius: radius.md,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.lg,
@@ -145,13 +151,13 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     letterSpacing: 4,
     textAlign: 'center',
-    color: colors.text,
+    color: c.text,
   },
-  inputError: { borderColor: colors.danger },
+  inputError: { borderColor: c.danger },
   error: { flexDirection: 'row', gap: spacing.sm, alignItems: 'flex-start' },
-  errorText: { ...type.caption, color: colors.danger, flex: 1, lineHeight: 18 },
+  errorText: { ...type.caption, color: c.danger, flex: 1, lineHeight: 18 },
   linkRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.xs },
-  link: { ...type.caption, color: colors.primary, fontWeight: '600' },
+  link: { ...type.caption, color: c.primary, fontWeight: '600' },
   signOut: { alignSelf: 'center' },
-  signOutText: { ...type.caption, color: colors.textOnPrimary, textDecorationLine: 'underline' },
+  signOutText: { ...type.caption, color: c.textOnPrimary, textDecorationLine: 'underline' },
 });

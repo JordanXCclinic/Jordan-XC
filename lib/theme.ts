@@ -10,12 +10,25 @@ export const brand = {
   black: '#000000',
 };
 
-export const colors = {
+/**
+ * Two palettes with identical keys. Screens never pick one — they read the
+ * active palette from useTheme(), so a component cannot accidentally hard-code
+ * the light one.
+ *
+ * Two roles look alike and are not:
+ *  - `primary` is a foreground. It sits on the page and has to be readable
+ *    against `background`, so in dark mode it lightens.
+ *  - `primarySurface` is a fill, with `textInverse` on top of it. It has to
+ *    stay dark enough for white text, so in dark mode it barely moves.
+ * One navy could do both jobs on a white page. On a near-black one it cannot.
+ */
+export const lightColors = {
   primary: brand.navy,
-  /** Pressed states and the dark half of the header gradient. */
   primaryDeep: '#00265E',
   /** Navy at ~8% over white — selected chips, info panels. */
   primaryTint: '#E7EDF7',
+  /** Filled navy: buttons, the next-practice card, the sign-in screen. */
+  primarySurface: brand.navy,
 
   accent: brand.red,
   accentDeep: '#9E2632',
@@ -31,6 +44,10 @@ export const colors = {
   text: '#101319',
   textMuted: '#5C626C',
   textFaint: '#8A8F99',
+  /**
+   * Text on a brand-coloured fill. White in both themes, because the fill it
+   * sits on is navy or red in both — it is not the inverse of `text`.
+   */
   textInverse: brand.white,
   /** Muted text on navy — readable without shouting. */
   textOnPrimary: '#C7D5EC',
@@ -44,6 +61,49 @@ export const colors = {
 
   overlay: 'rgba(16, 19, 25, 0.45)',
 };
+
+export type Palette = typeof lightColors;
+
+export const darkColors: Palette = {
+  // Lightened well past the logo navy so it reads as a link or an icon against
+  // the near-black page.
+  primary: '#7FA9F0',
+  primaryDeep: '#9DBEF5',
+  primaryTint: '#152239',
+  // Barely moved: white still has to sit on this.
+  primarySurface: '#12305F',
+
+  accent: '#F2707E',
+  accentDeep: '#F79AA4',
+  accentTint: '#2E1620',
+
+  background: '#080D18',
+  surface: '#101A2E',
+  surfaceSunken: '#0B1322',
+  border: '#1D2942',
+  borderStrong: '#2B3A57',
+
+  text: '#F2F5FA',
+  textMuted: '#A9B5C9',
+  textFaint: '#7B8799',
+  textInverse: brand.white,
+  textOnPrimary: '#C3D5F2',
+
+  success: '#5BC48D',
+  successTint: '#10281D',
+  warning: '#E3A94F',
+  warningTint: '#2B2214',
+  danger: '#F2707E',
+  dangerTint: '#2E1620',
+
+  overlay: 'rgba(0, 0, 0, 0.62)',
+};
+
+/**
+ * The light palette, for the few places outside a component that need a colour.
+ * Anything rendered should use useTheme() instead.
+ */
+export const colors = lightColors;
 
 export const spacing = {
   xs: 4,
@@ -104,10 +164,10 @@ export const HIT_SLOP = { top: 8, bottom: 8, left: 8, right: 8 };
  * Shared look for pushed (stack) screens: navy bar, white title, no hairline.
  * Tab screens draw their own large titles instead.
  */
-export const stackHeader = {
-  headerStyle: { backgroundColor: colors.primary },
-  headerTintColor: colors.textInverse,
-  headerTitleStyle: { fontSize: 17, fontWeight: '700' as const, color: colors.textInverse },
+export const stackHeaderFor = (c: Palette) => ({
+  headerStyle: { backgroundColor: c.primarySurface },
+  headerTintColor: c.textInverse,
+  headerTitleStyle: { fontSize: 17, fontWeight: '700' as const, color: c.textInverse },
   headerShadowVisible: false,
   headerBackTitle: 'Back',
-};
+});

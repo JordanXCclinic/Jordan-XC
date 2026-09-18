@@ -11,15 +11,20 @@ import { useAthlete } from '../lib/athlete';
 import { useAuth } from '../lib/auth';
 import { firstName, formatDayHeading, formatRelative, formatTime } from '../lib/format';
 import { isSupabaseConfigured, supabase } from '../lib/supabase';
-import {
-  MEETING_MODE_LABELS,
+import { MEETING_MODE_LABELS,
   MEETING_SLOT_COLUMNS,
   isCoach,
   type MeetingSlot,
 } from '../lib/types';
-import { colors, spacing, type } from '../lib/theme';
+import { spacing, type, type Palette } from '../lib/theme';
+import { useTheme, useThemedStyles } from '../lib/appearance';
 
 export default function Meetings() {
+
+  const c = useTheme();
+
+  const styles = useThemedStyles(makeStyles);
+
   const { role } = useAuth();
   const { athletes, activeAthleteId, setActiveAthleteId, activeAthlete } = useAthlete();
 
@@ -131,7 +136,7 @@ export default function Meetings() {
                     onPress={() => void cancel(slot)}
                     style={({ pressed }) => [styles.cancel, pressed && styles.pressed]}
                   >
-                    <Ionicons name="close-circle-outline" size={16} color={colors.danger} />
+                    <Ionicons name="close-circle-outline" size={16} color={c.danger} />
                     <Text style={styles.cancelText}>Cancel this meeting</Text>
                   </Pressable>
                 </Card>
@@ -233,14 +238,15 @@ export default function Meetings() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (c: Palette) =>
+  StyleSheet.create({
   head: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.md },
   headText: { flex: 1 },
-  day: { ...type.overline, color: colors.textFaint },
-  time: { ...type.title, color: colors.primary, marginTop: 2 },
-  meta: { ...type.caption, color: colors.textMuted, marginTop: spacing.xs },
-  notes: { ...type.body, color: colors.textMuted, marginTop: spacing.sm },
-  topic: { ...type.body, color: colors.text, fontStyle: 'italic', marginTop: spacing.sm },
+  day: { ...type.overline, color: c.textFaint },
+  time: { ...type.title, color: c.primary, marginTop: 2 },
+  meta: { ...type.caption, color: c.textMuted, marginTop: spacing.xs },
+  notes: { ...type.body, color: c.textMuted, marginTop: spacing.sm },
+  topic: { ...type.body, color: c.text, fontStyle: 'italic', marginTop: spacing.sm },
   cancel: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -248,22 +254,22 @@ const styles = StyleSheet.create({
     marginTop: spacing.lg,
     paddingTop: spacing.md,
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.border,
+    borderTopColor: c.border,
   },
   pressed: { opacity: 0.7 },
-  cancelText: { ...type.label, color: colors.danger },
-  error: { ...type.caption, color: colors.danger },
-  hint: { ...type.caption, color: colors.textFaint, textAlign: 'center' },
-  backdrop: { flex: 1, backgroundColor: colors.overlay },
+  cancelText: { ...type.label, color: c.danger },
+  error: { ...type.caption, color: c.danger },
+  hint: { ...type.caption, color: c.textFaint, textAlign: 'center' },
+  backdrop: { flex: 1, backgroundColor: c.overlay },
   sheet: {
-    backgroundColor: colors.background,
+    backgroundColor: c.background,
     borderTopLeftRadius: 22,
     borderTopRightRadius: 22,
     maxHeight: '80%',
   },
   sheetContent: { padding: spacing.xl, gap: spacing.lg },
-  sheetKicker: { ...type.overline, color: colors.primary },
-  sheetTitle: { ...type.title, color: colors.text },
+  sheetKicker: { ...type.overline, color: c.primary },
+  sheetTitle: { ...type.title, color: c.text },
   actions: { flexDirection: 'row', gap: spacing.md },
   action: { flex: 1 },
 });

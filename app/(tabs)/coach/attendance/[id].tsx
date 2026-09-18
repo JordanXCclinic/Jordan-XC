@@ -10,7 +10,8 @@ import { useAuth } from '../../../../lib/auth';
 import { formatDayHeading, formatTime } from '../../../../lib/format';
 import { isSupabaseConfigured, supabase } from '../../../../lib/supabase';
 import { PRACTICE_COLUMNS, PROFILE_COLUMNS, type Practice, type Profile } from '../../../../lib/types';
-import { colors, spacing, type } from '../../../../lib/theme';
+import { spacing, type, type Palette } from '../../../../lib/theme';
+import { useTheme, useThemedStyles } from '../../../../lib/appearance';
 
 type Status = 'present' | 'absent' | 'excused';
 
@@ -27,6 +28,9 @@ const OPTIONS: { value: Status; label: string }[] = [
  * no list at all.
  */
 export default function Attendance() {
+  const c = useTheme();
+  const styles = useThemedStyles(makeStyles);
+
   const { id } = useLocalSearchParams<{ id: string }>();
   const { profile } = useAuth();
 
@@ -163,10 +167,11 @@ export default function Attendance() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (c: Palette) =>
+  StyleSheet.create({
   counts: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-  error: { ...type.caption, color: colors.danger },
+  error: { ...type.caption, color: c.danger },
   row: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
-  name: { ...type.bodyStrong, color: colors.text, flex: 1 },
+  name: { ...type.bodyStrong, color: c.text, flex: 1 },
   control: { marginTop: spacing.md },
 });

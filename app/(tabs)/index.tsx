@@ -9,8 +9,7 @@ import { EmptyState, Screen, SectionHeader } from '../../components/Screen';
 import { SegmentedControl } from '../../components/SegmentedControl';
 import { useAthlete } from '../../lib/athlete';
 import { useAuth } from '../../lib/auth';
-import {
-  firstName,
+import { firstName,
   formatDayHeading,
   formatMiles,
   formatRelative,
@@ -18,8 +17,7 @@ import {
 } from '../../lib/format';
 import { isSupabaseConfigured, supabase } from '../../lib/supabase';
 import { currentWeekNumber, planDayToday } from '../../lib/training';
-import {
-  ANNOUNCEMENT_COLUMNS,
+import { ANNOUNCEMENT_COLUMNS,
   PRACTICE_COLUMNS,
   WORKOUT_COLUMNS,
   isAthlete,
@@ -28,9 +26,15 @@ import {
   type Practice,
   type Workout,
 } from '../../lib/types';
-import { colors, radius, shadow, spacing, type } from '../../lib/theme';
+import { radius, shadow, spacing, type, type Palette } from '../../lib/theme';
+import { useTheme, useThemedStyles } from '../../lib/appearance';
 
 export default function Home() {
+
+  const c = useTheme();
+
+  const styles = useThemedStyles(makeStyles);
+
   const { profile, role } = useAuth();
   const { athletes, activeAthleteId, setActiveAthleteId } = useAthlete();
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
@@ -176,6 +180,11 @@ export default function Home() {
 }
 
 function NextPractice({ practice }: { practice: Practice | null }) {
+
+  const c = useTheme();
+
+  const styles = useThemedStyles(makeStyles);
+
   if (!practice) {
     return (
       <EmptyState
@@ -198,7 +207,7 @@ function NextPractice({ practice }: { practice: Practice | null }) {
       <Text style={styles.heroDay}>{formatDayHeading(practice.starts_at)}</Text>
       <Text style={styles.heroTime}>{formatTime(practice.starts_at)}</Text>
       <View style={styles.heroFoot}>
-        <Ionicons name="location" size={15} color={colors.textOnPrimary} />
+        <Ionicons name="location" size={15} color={c.textOnPrimary} />
         <Text style={styles.heroLocation} numberOfLines={1}>
           {practice.location_name}
         </Text>
@@ -221,6 +230,11 @@ function QuickAction({
   label: string;
   onPress: () => void;
 }) {
+
+  const c = useTheme();
+
+  const styles = useThemedStyles(makeStyles);
+
   return (
     <Pressable
       accessibilityRole="button"
@@ -229,16 +243,17 @@ function QuickAction({
       style={({ pressed }) => [styles.quick, pressed && styles.quickPressed]}
     >
       <View style={styles.quickIcon}>
-        <Ionicons name={icon} size={20} color={colors.primary} />
+        <Ionicons name={icon} size={20} color={c.primary} />
       </View>
       <Text style={styles.quickLabel}>{label}</Text>
     </Pressable>
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (c: Palette) =>
+  StyleSheet.create({
   hero: {
-    backgroundColor: colors.primary,
+    backgroundColor: c.primarySurface,
     borderRadius: radius.xl,
     padding: spacing.xl,
     gap: spacing.xs,
@@ -246,34 +261,34 @@ const styles = StyleSheet.create({
   },
   heroPressed: { opacity: 0.94 },
   heroTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  heroKicker: { ...type.overline, color: colors.textOnPrimary },
-  heroRelative: { ...type.caption, color: colors.textOnPrimary },
-  heroDay: { ...type.title, color: colors.textInverse, marginTop: spacing.sm },
-  heroTime: { ...type.display, color: colors.textInverse, fontSize: 34 },
+  heroKicker: { ...type.overline, color: c.textOnPrimary },
+  heroRelative: { ...type.caption, color: c.textOnPrimary },
+  heroDay: { ...type.title, color: c.textInverse, marginTop: spacing.sm },
+  heroTime: { ...type.display, color: c.textInverse, fontSize: 34 },
   heroFoot: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginTop: spacing.sm },
-  heroLocation: { ...type.body, color: colors.textOnPrimary, flex: 1 },
+  heroLocation: { ...type.body, color: c.textOnPrimary, flex: 1 },
   heroFlag: {
     alignSelf: 'flex-start',
     marginTop: spacing.sm,
-    backgroundColor: colors.accent,
+    backgroundColor: c.accent,
     borderRadius: radius.sm,
     paddingHorizontal: spacing.sm,
     paddingVertical: 3,
   },
-  heroFlagText: { ...type.caption, color: colors.textInverse, fontWeight: '700', letterSpacing: 0.5 },
-  kicker: { ...type.overline, color: colors.primary },
-  workoutTitle: { ...type.heading, color: colors.text, marginTop: spacing.xs },
+  heroFlagText: { ...type.caption, color: c.textInverse, fontWeight: '700', letterSpacing: 0.5 },
+  kicker: { ...type.overline, color: c.primary },
+  workoutTitle: { ...type.heading, color: c.text, marginTop: spacing.xs },
   metaRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm, flexWrap: 'wrap' },
-  workoutBody: { ...type.body, color: colors.textMuted, marginTop: spacing.sm },
+  workoutBody: { ...type.body, color: c.textMuted, marginTop: spacing.sm },
   quickRow: { flexDirection: 'row', gap: spacing.md },
   quick: {
     flex: 1,
     alignItems: 'center',
     gap: spacing.sm,
-    backgroundColor: colors.surface,
+    backgroundColor: c.surface,
     borderRadius: radius.lg,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: c.border,
     paddingVertical: spacing.lg,
     paddingHorizontal: spacing.md,
   },
@@ -282,13 +297,13 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: radius.pill,
-    backgroundColor: colors.primaryTint,
+    backgroundColor: c.primaryTint,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  quickLabel: { ...type.label, color: colors.text, textAlign: 'center' },
+  quickLabel: { ...type.label, color: c.text, textAlign: 'center' },
   announcementHead: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md },
-  announcementTitle: { ...type.heading, color: colors.text, flex: 1 },
-  announcementWhen: { ...type.caption, color: colors.textFaint },
-  announcementBody: { ...type.body, color: colors.textMuted, marginTop: spacing.sm },
+  announcementTitle: { ...type.heading, color: c.text, flex: 1 },
+  announcementWhen: { ...type.caption, color: c.textFaint },
+  announcementBody: { ...type.body, color: c.textMuted, marginTop: spacing.sm },
 });

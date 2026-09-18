@@ -11,13 +11,13 @@ import { EmptyState, LoadingState, Screen, SectionHeader } from '../../../compon
 import { useAuth } from '../../../lib/auth';
 import { formatDayHeading, formatTime } from '../../../lib/format';
 import { isSupabaseConfigured, supabase } from '../../../lib/supabase';
-import {
-  AUDIENCE_LABELS,
+import { AUDIENCE_LABELS,
   PRACTICE_COLUMNS,
   type Audience,
   type Practice,
 } from '../../../lib/types';
-import { colors, spacing, type } from '../../../lib/theme';
+import { spacing, type, type Palette } from '../../../lib/theme';
+import { useTheme, useThemedStyles } from '../../../lib/appearance';
 
 const AUDIENCES = (Object.keys(AUDIENCE_LABELS) as Audience[]).map((value) => ({
   value,
@@ -33,6 +33,11 @@ function defaultStart(): Date {
 }
 
 export default function CoachPractices() {
+
+  const c = useTheme();
+
+  const styles = useThemedStyles(makeStyles);
+
   const { profile } = useAuth();
   const [practices, setPractices] = useState<Practice[]>([]);
   const [loading, setLoading] = useState(true);
@@ -250,7 +255,7 @@ export default function CoachPractices() {
                 <RowAction
                   icon="close-circle-outline"
                   label="Cancel"
-                  tone={colors.danger}
+                  tone={c.danger}
                   onPress={() => void setStatus(practice, 'cancelled')}
                 />
               ) : (
@@ -272,7 +277,7 @@ export default function CoachPractices() {
               <RowAction
                 icon="trash-outline"
                 label="Delete"
-                tone={colors.danger}
+                tone={c.danger}
                 onPress={() => confirmDelete(practice)}
               />
             </View>
@@ -287,44 +292,52 @@ function RowAction({
   icon,
   label,
   onPress,
-  tone = colors.primary,
+  tone,
 }: {
   icon: keyof typeof Ionicons.glyphMap;
   label: string;
   onPress: () => void;
+  /** Defaults to the theme's accent, which is not knowable at parameter level. */
   tone?: string;
 }) {
+
+  const c = useTheme();
+
+  const styles = useThemedStyles(makeStyles);
+  const ink = tone ?? c.primary;
+
   return (
     <Pressable
       accessibilityRole="button"
       onPress={onPress}
       style={({ pressed }) => [styles.rowAction, pressed && styles.pressed]}
     >
-      <Ionicons name={icon} size={16} color={tone} />
-      <Text style={[styles.rowActionText, { color: tone }]}>{label}</Text>
+      <Ionicons name={icon} size={16} color={ink} />
+      <Text style={[styles.rowActionText, { color: ink }]}>{label}</Text>
     </Pressable>
   );
 }
 
-const styles = StyleSheet.create({
-  cardTitle: { ...type.heading, color: colors.text },
+const makeStyles = (c: Palette) =>
+  StyleSheet.create({
+  cardTitle: { ...type.heading, color: c.text },
   fields: { gap: spacing.lg, marginTop: spacing.lg },
   submit: { marginTop: spacing.lg },
   cancel: { marginTop: spacing.sm },
-  error: { ...type.caption, color: colors.danger, marginTop: spacing.md },
+  error: { ...type.caption, color: c.danger, marginTop: spacing.md },
   head: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.md },
   headText: { flex: 1 },
-  day: { ...type.overline, color: colors.textFaint },
-  time: { ...type.title, color: colors.primary, marginTop: 2 },
-  location: { ...type.bodyStrong, color: colors.text, marginTop: spacing.sm },
-  meta: { ...type.caption, color: colors.textMuted, marginTop: 2 },
+  day: { ...type.overline, color: c.textFaint },
+  time: { ...type.title, color: c.primary, marginTop: 2 },
+  location: { ...type.bodyStrong, color: c.text, marginTop: spacing.sm },
+  meta: { ...type.caption, color: c.textMuted, marginTop: 2 },
   rowActions: {
     flexDirection: 'row',
     gap: spacing.lg,
     marginTop: spacing.md,
     paddingTop: spacing.md,
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.border,
+    borderTopColor: c.border,
     flexWrap: 'wrap',
   },
   rowAction: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },

@@ -1,9 +1,12 @@
 import { Stack } from 'expo-router';
-import { stackHeader } from '../../../lib/theme';
+import { stackHeaderFor } from '../../../lib/theme';
+import { useTheme } from '../../../lib/appearance';
 
 export default function CoachLayout() {
+  const c = useTheme();
+
   return (
-    <Stack screenOptions={{ ...stackHeader, headerShown: true }}>
+    <Stack screenOptions={{ ...stackHeaderFor(c), headerShown: true }}>
       {/* The dashboard renders its own large title, so it needs no bar. */}
       <Stack.Screen name="index" options={{ headerShown: false }} />
       <Stack.Screen name="codes" options={{ title: 'Clinic codes' }} />

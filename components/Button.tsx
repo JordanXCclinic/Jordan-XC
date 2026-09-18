@@ -1,7 +1,6 @@
 import * as Haptics from 'expo-haptics';
 import { forwardRef } from 'react';
-import {
-  ActivityIndicator,
+import { ActivityIndicator,
   Platform,
   Pressable,
   StyleSheet,
@@ -11,7 +10,8 @@ import {
   type ViewStyle,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, radius, shadow, spacing, type } from '../lib/theme';
+import { radius, shadow, spacing, type, type Palette } from '../lib/theme';
+import { useTheme, useThemedStyles } from '../lib/appearance';
 
 type Variant = 'primary' | 'secondary' | 'ghost' | 'danger';
 type Size = 'md' | 'lg';
@@ -28,26 +28,28 @@ type Props = {
   style?: StyleProp<ViewStyle>;
 };
 
-const FILL: Record<Variant, ViewStyle> = {
-  primary: { backgroundColor: colors.primary },
-  secondary: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
+const fills = (c: Palette): Record<Variant, ViewStyle> => ({
+  primary: { backgroundColor: c.primarySurface },
+  secondary: { backgroundColor: c.surface, borderWidth: 1, borderColor: c.border },
   ghost: { backgroundColor: 'transparent' },
-  danger: { backgroundColor: colors.danger },
-};
+  danger: { backgroundColor: c.danger },
+});
 
-const INK: Record<Variant, string> = {
-  primary: colors.textInverse,
-  secondary: colors.text,
-  ghost: colors.primary,
-  danger: colors.textInverse,
-};
+const inks = (c: Palette): Record<Variant, string> => ({
+  primary: c.textInverse,
+  secondary: c.text,
+  ghost: c.primary,
+  danger: c.textInverse,
+});
 
 export const Button = forwardRef<View, Props>(function Button(
   { label, onPress, variant = 'primary', size = 'md', icon, loading, disabled, full, style },
   ref
 ) {
+  const c = useTheme();
+  const styles = useThemedStyles(makeStyles);
   const blocked = Boolean(disabled || loading);
-  const ink = INK[variant];
+  const ink = inks(c)[variant];
 
   function handlePress() {
     // A short tick on the way out makes the app feel responsive even while the
@@ -67,7 +69,7 @@ export const Button = forwardRef<View, Props>(function Button(
       style={({ pressed }) => [
         styles.base,
         size === 'lg' && styles.lg,
-        FILL[variant],
+        fills(c)[variant],
         variant !== 'ghost' && shadow.card,
         full && styles.full,
         pressed && styles.pressed,
@@ -89,7 +91,8 @@ export const Button = forwardRef<View, Props>(function Button(
   );
 });
 
-const styles = StyleSheet.create({
+const makeStyles = (c: Palette) =>
+  StyleSheet.create({
   base: {
     minHeight: 46,
     flexDirection: 'row',

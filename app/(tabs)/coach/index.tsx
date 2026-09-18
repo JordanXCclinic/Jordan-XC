@@ -8,7 +8,8 @@ import { useAuth } from '../../../lib/auth';
 import { firstName } from '../../../lib/format';
 import { isSupabaseConfigured, supabase } from '../../../lib/supabase';
 import { isCoach, isHeadCoach } from '../../../lib/types';
-import { colors, radius, shadow, spacing, type } from '../../../lib/theme';
+import { radius, shadow, spacing, type, type Palette } from '../../../lib/theme';
+import { useTheme, useThemedStyles } from '../../../lib/appearance';
 
 type Counts = {
   athletes: number;
@@ -78,6 +79,11 @@ const TOOLS = [
 ];
 
 export default function CoachHome() {
+
+  const c = useTheme();
+
+  const styles = useThemedStyles(makeStyles);
+
   const { profile, role } = useAuth();
   const [counts, setCounts] = useState<Counts>(ZERO);
 
@@ -139,7 +145,7 @@ export default function CoachHome() {
           onPress={() => router.push('/(tabs)/coach/announcements')}
           style={({ pressed }) => [styles.alert, pressed && styles.pressed]}
         >
-          <Ionicons name="document-text-outline" size={18} color={colors.warning} />
+          <Ionicons name="document-text-outline" size={18} color={c.warning} />
           <Text style={styles.alertText}>
             {counts.drafts} unpublished {counts.drafts === 1 ? 'announcement' : 'announcements'} — nobody
             can see {counts.drafts === 1 ? 'it' : 'them'} yet.
@@ -161,7 +167,7 @@ export default function CoachHome() {
             style={({ pressed }) => [styles.tool, pressed && styles.pressed]}
           >
             <View style={styles.toolIcon}>
-              <Ionicons name={tool.icon} size={20} color={colors.primary} />
+              <Ionicons name={tool.icon} size={20} color={c.primary} />
             </View>
             <Text style={styles.toolTitle}>{tool.title}</Text>
             <Text style={styles.toolSubtitle}>{tool.subtitle}</Text>
@@ -176,6 +182,11 @@ export default function CoachHome() {
 }
 
 function Stat({ label, value }: { label: string; value: number }) {
+
+  const c = useTheme();
+
+  const styles = useThemedStyles(makeStyles);
+
   return (
     <View style={styles.stat}>
       <Text style={styles.statValue}>{value}</Text>
@@ -184,37 +195,38 @@ function Stat({ label, value }: { label: string; value: number }) {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (c: Palette) =>
+  StyleSheet.create({
   stats: { flexDirection: 'row', gap: spacing.md },
   stat: {
     flex: 1,
-    backgroundColor: colors.primary,
+    backgroundColor: c.primarySurface,
     borderRadius: radius.lg,
     paddingVertical: spacing.lg,
     alignItems: 'center',
     gap: 2,
     ...shadow.card,
   },
-  statValue: { ...type.display, color: colors.textInverse, fontSize: 26 },
-  statLabel: { ...type.caption, color: colors.textOnPrimary },
+  statValue: { ...type.display, color: c.textInverse, fontSize: 26 },
+  statLabel: { ...type.caption, color: c.textOnPrimary },
   alert: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.md,
-    backgroundColor: colors.warningTint,
+    backgroundColor: c.warningTint,
     borderRadius: radius.md,
     padding: spacing.lg,
   },
-  alertText: { ...type.caption, color: colors.warning, flex: 1, lineHeight: 18 },
+  alertText: { ...type.caption, color: c.warning, flex: 1, lineHeight: 18 },
   pressed: { opacity: 0.85 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md },
   tool: {
     flexGrow: 1,
     flexBasis: '46%',
-    backgroundColor: colors.background,
+    backgroundColor: c.background,
     borderRadius: radius.lg,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: c.border,
     padding: spacing.lg,
     gap: spacing.xs,
     ...shadow.card,
@@ -223,12 +235,12 @@ const styles = StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: radius.md,
-    backgroundColor: colors.primaryTint,
+    backgroundColor: c.primaryTint,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: spacing.xs,
   },
-  toolTitle: { ...type.bodyStrong, color: colors.text },
-  toolSubtitle: { ...type.caption, color: colors.textMuted, lineHeight: 16 },
-  toolMeta: { ...type.caption, color: colors.accent, fontWeight: '700', marginTop: spacing.xs },
+  toolTitle: { ...type.bodyStrong, color: c.text },
+  toolSubtitle: { ...type.caption, color: c.textMuted, lineHeight: 16 },
+  toolMeta: { ...type.caption, color: c.accent, fontWeight: '700', marginTop: spacing.xs },
 });

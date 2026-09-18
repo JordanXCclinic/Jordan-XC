@@ -9,13 +9,13 @@ import { EmptyState, LoadingState, Screen, SectionHeader } from '../../../compon
 import { useAuth } from '../../../lib/auth';
 import { formatRelative } from '../../../lib/format';
 import { isSupabaseConfigured, supabase } from '../../../lib/supabase';
-import {
-  ANNOUNCEMENT_COLUMNS,
+import { ANNOUNCEMENT_COLUMNS,
   AUDIENCE_LABELS,
   type Announcement,
   type Audience,
 } from '../../../lib/types';
-import { colors, spacing, type } from '../../../lib/theme';
+import { spacing, type, type Palette } from '../../../lib/theme';
+import { useTheme, useThemedStyles } from '../../../lib/appearance';
 
 const AUDIENCES = (Object.keys(AUDIENCE_LABELS) as Audience[]).map((value) => ({
   value,
@@ -23,6 +23,11 @@ const AUDIENCES = (Object.keys(AUDIENCE_LABELS) as Audience[]).map((value) => ({
 }));
 
 export default function CoachAnnouncements() {
+
+  const c = useTheme();
+
+  const styles = useThemedStyles(makeStyles);
+
   const { profile } = useAuth();
   const [items, setItems] = useState<Announcement[]>([]);
   const [loading, setLoading] = useState(true);
@@ -195,7 +200,7 @@ export default function CoachAnnouncements() {
                   <Ionicons
                     name={published ? 'eye-off-outline' : 'send-outline'}
                     size={16}
-                    color={colors.primary}
+                    color={c.primary}
                   />
                   <Text style={styles.rowActionText}>{published ? 'Unpublish' : 'Publish'}</Text>
                 </Pressable>
@@ -205,7 +210,7 @@ export default function CoachAnnouncements() {
                   onPress={() => confirmDelete(item)}
                   style={({ pressed }) => [styles.rowAction, pressed && styles.pressed]}
                 >
-                  <Ionicons name="trash-outline" size={16} color={colors.danger} />
+                  <Ionicons name="trash-outline" size={16} color={c.danger} />
                   <Text style={[styles.rowActionText, styles.danger]}>Delete</Text>
                 </Pressable>
               </View>
@@ -217,27 +222,28 @@ export default function CoachAnnouncements() {
   );
 }
 
-const styles = StyleSheet.create({
-  cardTitle: { ...type.heading, color: colors.text },
+const makeStyles = (c: Palette) =>
+  StyleSheet.create({
+  cardTitle: { ...type.heading, color: c.text },
   fields: { gap: spacing.lg, marginTop: spacing.lg },
   actions: { flexDirection: 'row', gap: spacing.md, marginTop: spacing.lg },
   action: { flex: 1 },
-  error: { ...type.caption, color: colors.danger, marginTop: spacing.md },
+  error: { ...type.caption, color: c.danger, marginTop: spacing.md },
   head: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md },
-  itemTitle: { ...type.heading, color: colors.text, flex: 1 },
-  itemBody: { ...type.body, color: colors.textMuted, marginTop: spacing.sm },
+  itemTitle: { ...type.heading, color: c.text, flex: 1 },
+  itemBody: { ...type.body, color: c.textMuted, marginTop: spacing.sm },
   metaRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: spacing.md },
-  meta: { ...type.caption, color: colors.textFaint },
+  meta: { ...type.caption, color: c.textFaint },
   rowActions: {
     flexDirection: 'row',
     gap: spacing.xl,
     marginTop: spacing.md,
     paddingTop: spacing.md,
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.border,
+    borderTopColor: c.border,
   },
   rowAction: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  rowActionText: { ...type.label, color: colors.primary },
-  danger: { color: colors.danger },
+  rowActionText: { ...type.label, color: c.primary },
+  danger: { color: c.danger },
   pressed: { opacity: 0.7 },
 });

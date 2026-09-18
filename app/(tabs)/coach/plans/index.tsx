@@ -7,13 +7,13 @@ import { ChipSelect, TextField } from '../../../../components/Field';
 import { EmptyState, LoadingState, Screen, SectionHeader } from '../../../../components/Screen';
 import { useAuth } from '../../../../lib/auth';
 import { isSupabaseConfigured, supabase } from '../../../../lib/supabase';
-import {
-  AUDIENCE_LABELS,
+import { AUDIENCE_LABELS,
   TRAINING_PLAN_COLUMNS,
   type Audience,
   type TrainingPlan,
 } from '../../../../lib/types';
-import { colors, spacing, type } from '../../../../lib/theme';
+import { spacing, type, type Palette } from '../../../../lib/theme';
+import { useTheme, useThemedStyles } from '../../../../lib/appearance';
 
 const AUDIENCES: { value: Audience; label: string }[] = [
   { value: 'clinic', label: AUDIENCE_LABELS.clinic },
@@ -24,6 +24,11 @@ const AUDIENCES: { value: Audience; label: string }[] = [
 type PlanRow = TrainingPlan & { workouts: { count: number }[]; plan_assignments: { count: number }[] };
 
 export default function CoachPlans() {
+
+  const c = useTheme();
+
+  const styles = useThemedStyles(makeStyles);
+
   const { profile } = useAuth();
   const [plans, setPlans] = useState<PlanRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -143,9 +148,10 @@ export default function CoachPlans() {
   );
 }
 
-const styles = StyleSheet.create({
-  cardTitle: { ...type.heading, color: colors.text },
+const makeStyles = (c: Palette) =>
+  StyleSheet.create({
+  cardTitle: { ...type.heading, color: c.text },
   fields: { gap: spacing.lg, marginTop: spacing.lg },
   submit: { marginTop: spacing.lg },
-  error: { ...type.caption, color: colors.danger, marginTop: spacing.md },
+  error: { ...type.caption, color: c.danger, marginTop: spacing.md },
 });

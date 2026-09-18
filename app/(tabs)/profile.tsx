@@ -11,10 +11,16 @@ import { useAthlete } from '../../lib/athlete';
 import { useAuth } from '../../lib/auth';
 import { firstName, roleLabel } from '../../lib/format';
 import { isAthlete, isCoach } from '../../lib/types';
-import { colors, spacing, type } from '../../lib/theme';
+import { spacing, type, type Palette } from '../../lib/theme';
 import { CLINIC_URL } from '../sign-in';
+import { useTheme, useThemedStyles } from '../../lib/appearance';
 
 export default function ProfileTab() {
+
+  const c = useTheme();
+
+  const styles = useThemedStyles(makeStyles);
+
   const { profile, role } = useAuth();
   const { athletes, activeAthleteId, setActiveAthleteId, activeAthlete, refresh } = useAthlete();
 
@@ -119,10 +125,11 @@ export default function ProfileTab() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (c: Palette) =>
+  StyleSheet.create({
   identity: { flexDirection: 'row', alignItems: 'center', gap: spacing.lg },
   identityText: { flex: 1, gap: spacing.sm },
-  name: { ...type.title, color: colors.text },
-  phone: { ...type.body, color: colors.textMuted, marginTop: spacing.md },
-  edit: { ...type.label, color: colors.primary },
+  name: { ...type.title, color: c.text },
+  phone: { ...type.body, color: c.textMuted, marginTop: spacing.md },
+  edit: { ...type.label, color: c.primary },
 });
