@@ -712,6 +712,55 @@ set role authenticated;
 reset role;
 
 -- ---------------------------------------------------------------------------
+-- Learn completions (0015).
+-- ---------------------------------------------------------------------------
+
+reset role;
+insert into posts (id, author_id, title, slug, body, published_at)
+values ('f0000000-0000-0000-0000-000000000001', :coach, 'Warming up', 'warm-up', 'x', now());
+
+set role authenticated;
+select set_config('request.jwt.claim.sub', :athlete, false);
+insert into lesson_completions (post_id, profile_id)
+values ('f0000000-0000-0000-0000-000000000001', :athlete);
+
+-- A coach can see that it was marked — that is the point of tracking it.
+select set_config('request.jwt.claim.sub', :coach, false);
+do $$
+declare n int;
+begin
+  select count(*) into n from lesson_completions
+   where post_id = 'f0000000-0000-0000-0000-000000000001';
+  if n = 1 then raise notice 'PASS: staff can see who has worked through a session';
+  else raise notice 'FAIL: coach saw % completions', n;
+  end if;
+end $$;
+
+-- But cannot mark it for them, which would make the count meaningless.
+do $$
+begin
+  insert into lesson_completions (post_id, profile_id)
+  values ('f0000000-0000-0000-0000-000000000001', '55555555-5555-5555-5555-555555555555');
+  raise notice 'FAIL: a coach marked a session done on an athlete''s behalf';
+exception when others then
+  raise notice 'PASS: only the athlete can mark their own session done (%)', sqlerrm;
+end $$;
+
+-- And another family sees nothing.
+select set_config('request.jwt.claim.sub', :newathlete, false);
+do $$
+declare n int;
+begin
+  select count(*) into n from lesson_completions
+   where profile_id = '22222222-2222-2222-2222-222222222222';
+  if n = 0 then raise notice 'PASS: another athlete cannot see who else has read what';
+  else raise notice 'FAIL: another athlete saw % completions', n;
+  end if;
+end $$;
+
+reset role;
+
+-- ---------------------------------------------------------------------------
 -- Push recipients (0012).
 -- ---------------------------------------------------------------------------
 

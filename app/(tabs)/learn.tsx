@@ -22,6 +22,7 @@ export default function Learn() {
   const styles = useThemedStyles(makeStyles);
 
   const [posts, setPosts] = useState<Post[]>([]);
+  const [done, setDone] = useState<Set<string>>(new Set());
   const [category, setCategory] = useState(ALL);
   const [loading, setLoading] = useState(true);
 
@@ -38,6 +39,13 @@ export default function Learn() {
       .order('published_at', { ascending: false })
       .limit(60);
     setPosts((data as Post[] | null) ?? []);
+
+    const { data: completions } = await supabase
+      .from('lesson_completions')
+      .select('post_id');
+    setDone(
+      new Set(((completions as { post_id: string }[] | null) ?? []).map((row) => row.post_id))
+    );
     setLoading(false);
   }, []);
 
@@ -58,7 +66,11 @@ export default function Learn() {
   return (
     <Screen
       title="Learn"
-      subtitle="Training, nutrition, and racing from the coaches"
+      subtitle={
+        posts.length > 0
+          ? `${done.size} of ${posts.length} done`
+          : 'Training, nutrition, and racing from the coaches'
+      }
       onRefresh={load}
     >
       {categories.length > 2 ? (
@@ -108,6 +120,12 @@ export default function Learn() {
             <View style={styles.cardBody}>
               <View style={styles.metaRow}>
                 {post.category ? <Text style={styles.category}>{post.category}</Text> : null}
+                {done.has(post.id) ? (
+                  <View style={styles.doneTag}>
+                    <Ionicons name="checkmark-circle" size={14} color={c.success} />
+                    <Text style={styles.doneText}>Done</Text>
+                  </View>
+                ) : null}
                 {post.video_url ? (
                   <View style={styles.videoTag}>
                     <Ionicons name="play-circle" size={14} color={c.accent} />
@@ -151,6 +169,8 @@ const makeStyles = (c: Palette) =>
   cardBody: { padding: spacing.lg, gap: spacing.xs },
   metaRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   category: { ...type.overline, color: c.primary },
+  doneTag: { flexDirection: 'row', alignItems: 'center', gap: 3 },
+  doneText: { ...type.overline, color: c.success },
   videoTag: { flexDirection: 'row', alignItems: 'center', gap: 3 },
   videoText: { ...type.overline, color: c.accent },
   title: { ...type.heading, color: c.text },

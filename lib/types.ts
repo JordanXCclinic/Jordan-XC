@@ -76,12 +76,13 @@ export type Announcement = {
   body: string;
   audience: Audience;
   audience_athlete_id: string | null;
+  pinned: boolean;
   published_at: string | null;
   created_at: string;
 };
 
 export const ANNOUNCEMENT_COLUMNS =
-  'id, title, body, audience, audience_athlete_id, published_at, created_at';
+  'id, title, body, audience, audience_athlete_id, pinned, published_at, created_at';
 
 export type Post = {
   id: string;

@@ -47,6 +47,10 @@ function projectId(): string | undefined {
 export async function enableNotifications(
   profileId: string
 ): Promise<{ ok: boolean; error: string | null }> {
+  if (Platform.OS === 'web') {
+    return { ok: false, error: 'Notifications work in the phone app, not in a browser.' };
+  }
+
   // Simulators cannot receive a push, and asking there returns a token that
   // never delivers.
   if (!Device.isDevice) {

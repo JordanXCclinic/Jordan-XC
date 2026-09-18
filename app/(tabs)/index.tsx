@@ -49,6 +49,9 @@ export default function Home() {
         .from('announcements')
         .select(ANNOUNCEMENT_COLUMNS)
         .not('published_at', 'is', null)
+        // Pinned first, then newest. The pin is for the thing that must not
+        // scroll away — a time change, a meet location.
+        .order('pinned', { ascending: false })
         .order('published_at', { ascending: false })
         .limit(20),
       supabase
@@ -164,7 +167,13 @@ export default function Home() {
         />
       ) : (
         announcements.map((item) => (
-          <Card key={item.id}>
+          <Card key={item.id} accent={item.pinned ? 'danger' : undefined}>
+            {item.pinned ? (
+              <View style={styles.pinRow}>
+                <Ionicons name="pin" size={13} color={c.accent} />
+                <Text style={styles.pinLabel}>Pinned</Text>
+              </View>
+            ) : null}
             <View style={styles.announcementHead}>
               <Text style={styles.announcementTitle}>{item.title}</Text>
               <Text style={styles.announcementWhen}>
@@ -302,6 +311,8 @@ const makeStyles = (c: Palette) =>
     justifyContent: 'center',
   },
   quickLabel: { ...type.label, color: c.text, textAlign: 'center' },
+  pinRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginBottom: spacing.sm },
+  pinLabel: { ...type.overline, color: c.accent },
   announcementHead: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md },
   announcementTitle: { ...type.heading, color: c.text, flex: 1 },
   announcementWhen: { ...type.caption, color: c.textFaint },

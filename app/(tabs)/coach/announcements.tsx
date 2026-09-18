@@ -5,7 +5,7 @@ import { Badge } from '../../../components/Badge';
 import { Button } from '../../../components/Button';
 import { Card } from '../../../components/Card';
 import { AudiencePicker } from '../../../components/AudiencePicker';
-import { TextField } from '../../../components/Field';
+import { SwitchRow, TextField } from '../../../components/Field';
 import { EmptyState, LoadingState, Screen, SectionHeader } from '../../../components/Screen';
 import { useAuth } from '../../../lib/auth';
 import { formatRelative } from '../../../lib/format';
@@ -33,6 +33,7 @@ export default function CoachAnnouncements() {
   const [body, setBody] = useState('');
   const [audience, setAudience] = useState<Audience>('everyone');
   const [audienceAthlete, setAudienceAthlete] = useState<string | null>(null);
+  const [pinned, setPinned] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -88,6 +89,7 @@ export default function CoachAnnouncements() {
       body: body.trim(),
       audience,
       audience_athlete_id: audienceAthlete,
+      pinned,
       published_at: publish ? new Date().toISOString() : null,
     });
 
@@ -100,6 +102,13 @@ export default function CoachAnnouncements() {
     setTitle('');
     setBody('');
     setAudience('everyone');
+    setAudienceAthlete(null);
+    setPinned(false);
+    await load();
+  }
+
+  async function setPinnedState(item: Announcement, next: boolean) {
+    await supabase.from('announcements').update({ pinned: next }).eq('id', item.id);
     await load();
   }
 
@@ -192,6 +201,7 @@ export default function CoachAnnouncements() {
             <Card key={item.id}>
               <View style={styles.head}>
                 <Text style={styles.itemTitle}>{item.title}</Text>
+                {item.pinned ? <Badge label="Pinned" tone="primary" /> : null}
                 <Badge
                   label={published ? 'Live' : 'Draft'}
                   tone={published ? 'success' : 'warning'}
@@ -223,6 +233,19 @@ export default function CoachAnnouncements() {
                     color={c.primary}
                   />
                   <Text style={styles.rowActionText}>{published ? 'Unpublish' : 'Publish'}</Text>
+                </Pressable>
+
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={() => void setPinnedState(item, !item.pinned)}
+                  style={({ pressed }) => [styles.rowAction, pressed && styles.pressed]}
+                >
+                  <Ionicons
+                    name={item.pinned ? 'remove-circle-outline' : 'pin-outline'}
+                    size={16}
+                    color={c.primary}
+                  />
+                  <Text style={styles.rowActionText}>{item.pinned ? 'Unpin' : 'Pin'}</Text>
                 </Pressable>
 
                 <Pressable

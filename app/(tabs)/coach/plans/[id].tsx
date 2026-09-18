@@ -32,6 +32,13 @@ function nextMonday(): Date {
   return date;
 }
 
+type LoggedBy = {
+  name: string;
+  effort: number | null;
+  /** Set when a parent entered it rather than the athlete. */
+  enteredBy: string | null;
+};
+
 export default function PlanEditor() {
 
   const c = useTheme();
@@ -45,6 +52,8 @@ export default function PlanEditor() {
   const [workouts, setWorkouts] = useState<Workout[]>([]);
   const [athletes, setAthletes] = useState<Profile[]>([]);
   const [assigned, setAssigned] = useState<Set<string>>(new Set());
+  /** Who has logged each workout, so a coach can see the week at a glance. */
+  const [logsByWorkout, setLogsByWorkout] = useState<Record<string, LoggedBy[]>>({});
   const [loading, setLoading] = useState(true);
 
   const [week, setWeek] = useState(1);
@@ -89,6 +98,57 @@ export default function PlanEditor() {
     setAssigned(
       new Set(((assignRows as { athlete_id: string }[] | null) ?? []).map((row) => row.athlete_id))
     );
+
+    // Who has done which session. One query for the plan rather than one per
+    // workout, then matched up in memory.
+    const workoutIds = ((workoutRows as Workout[] | null) ?? []).map((workout) => workout.id);
+    if (workoutIds.length > 0) {
+      const { data: logRows } = await supabase
+        .from('workout_logs')
+        .select('workout_id, athlete_id, effort, logged_by')
+        .in('workout_id', workoutIds);
+
+      const logs = (logRows as
+        | { workout_id: string; athlete_id: string; effort: number | null; logged_by: string | null }[]
+        | null) ?? [];
+
+      const names = new Map(
+        ((athleteRows as Profile[] | null) ?? []).map((a) => [a.id, a.full_name])
+      );
+      // A parent who entered a log may not be on the athlete roster.
+      const enteredIds = [
+        ...new Set(
+          logs
+            .map((log) => log.logged_by)
+            .filter((id): id is string => id !== null && !names.has(id))
+        ),
+      ];
+      if (enteredIds.length > 0) {
+        const { data: people } = await supabase
+          .from('profiles')
+          .select('id, full_name')
+          .in('id', enteredIds);
+        for (const person of (people as { id: string; full_name: string }[] | null) ?? []) {
+          names.set(person.id, person.full_name);
+        }
+      }
+
+      const grouped: Record<string, LoggedBy[]> = {};
+      for (const log of logs) {
+        (grouped[log.workout_id] ??= []).push({
+          name: names.get(log.athlete_id) ?? 'An athlete',
+          effort: log.effort,
+          enteredBy:
+            log.logged_by && log.logged_by !== log.athlete_id
+              ? (names.get(log.logged_by) ?? 'a parent')
+              : null,
+        });
+      }
+      setLogsByWorkout(grouped);
+    } else {
+      setLogsByWorkout({});
+    }
+
     setLoading(false);
   }, [id]);
 
@@ -317,6 +377,27 @@ export default function PlanEditor() {
               {workout.intensity ? <Badge label={workout.intensity} /> : null}
             </View>
             {workout.description ? <Text style={styles.body}>{workout.description}</Text> : null}
+
+            <View style={styles.logs}>
+              <Text style={styles.logsHead}>
+                Logged by {logsByWorkout[workout.id]?.length ?? 0} of {assigned.size}
+              </Text>
+              {(logsByWorkout[workout.id] ?? []).map((log, index) => (
+                <View key={`${workout.id}-${index}`} style={styles.logRow}>
+                  <Text style={styles.logName} numberOfLines={1}>
+                    {log.name}
+                    {log.enteredBy ? ` · entered by ${log.enteredBy}` : ''}
+                  </Text>
+                  {/* Eight and above is where a coach wants to look twice. */}
+                  {log.effort !== null ? (
+                    <Badge
+                      label={`${log.effort}/10`}
+                      tone={log.effort >= 8 ? 'danger' : 'neutral'}
+                    />
+                  ) : null}
+                </View>
+              ))}
+            </View>
           </Card>
         ))
       )}
@@ -378,6 +459,16 @@ const makeStyles = (c: Palette) =>
   submit: { marginTop: spacing.lg },
   cancel: { marginTop: spacing.sm },
   cardActions: { flexDirection: 'row', alignItems: 'center', gap: spacing.lg },
+  logs: {
+    marginTop: spacing.md,
+    paddingTop: spacing.md,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: c.border,
+    gap: spacing.sm,
+  },
+  logsHead: { ...type.overline, color: c.textFaint },
+  logRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.md },
+  logName: { ...type.caption, color: c.textMuted, flex: 1 },
   error: { ...type.caption, color: c.danger, marginTop: spacing.md },
   head: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   day: { ...type.overline, color: c.textFaint },

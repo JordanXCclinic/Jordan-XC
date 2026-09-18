@@ -2,16 +2,16 @@ import { useCallback, useEffect } from 'react';
 import { Stack, type ErrorBoundaryProps } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as WebBrowser from 'expo-web-browser';
-import { Button } from '../components/Button';
 import { OfflineBanner } from '../components/OfflineBanner';
 import { AppearanceProvider, useAppearance, useTheme } from '../lib/appearance';
 import { AthleteProvider } from '../lib/athlete';
 import { AuthProvider, useAuth } from '../lib/auth';
 import { reportError } from '../lib/errors';
+import { useNotificationTaps } from '../lib/useNotificationTaps';
 import { SUPPORT_EMAIL } from '../lib/legal';
 import { lightColors, radius, spacing, stackHeaderFor, type } from '../lib/theme';
 
@@ -50,19 +50,29 @@ export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
           usually clears it.
         </Text>
 
-        <Button label="Try again" size="lg" full onPress={() => retry()} />
+        {/* Plain Pressables, not the app's Button: that reads the theme from a
+            provider which may be exactly what failed. Nothing on this screen
+            may depend on the rest of the app working. */}
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => retry()}
+          style={({ pressed }) => [errorStyles.primary, pressed && errorStyles.pressed]}
+        >
+          <Text style={errorStyles.primaryLabel}>Try again</Text>
+        </Pressable>
 
-        <Button
-          label="Tell the clinic"
-          variant="secondary"
-          full
+        <Pressable
+          accessibilityRole="button"
           onPress={() =>
             void WebBrowser.openBrowserAsync(
               `mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent('Jordan XC app problem')}` +
                 `&body=${encodeURIComponent(`What happened:\n\n\n---\n${error.message}`)}`
             )
           }
-        />
+          style={({ pressed }) => [errorStyles.secondary, pressed && errorStyles.pressed]}
+        >
+          <Text style={errorStyles.secondaryLabel}>Tell the clinic</Text>
+        </Pressable>
 
         {/* The message is kept visible rather than hidden behind a build flag:
             when a parent emails about a problem, this is what makes it fixable. */}
@@ -85,6 +95,27 @@ const errorStyles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  primary: {
+    minHeight: 54,
+    borderRadius: radius.lg,
+    backgroundColor: lightColors.primarySurface,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: spacing.lg,
+  },
+  primaryLabel: { ...type.bodyStrong, color: lightColors.textInverse, fontSize: 16 },
+  secondary: {
+    minHeight: 54,
+    borderRadius: radius.lg,
+    backgroundColor: lightColors.surface,
+    borderWidth: 1,
+    borderColor: lightColors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: spacing.lg,
+  },
+  secondaryLabel: { ...type.bodyStrong, color: lightColors.text, fontSize: 16 },
+  pressed: { opacity: 0.85 },
   title: { ...type.display, color: lightColors.text, fontSize: 26 },
   body: { ...type.body, color: lightColors.textMuted },
   detail: {
@@ -117,6 +148,11 @@ export default function RootLayout() {
 function Shell() {
   const c = useTheme();
   const { scheme } = useAppearance();
+  const { session, profileLoaded } = useAuth();
+
+  // Only navigate once there is somewhere to navigate to: pushing a route
+  // before the gate has resolved would land on the sign-in screen.
+  useNotificationTaps(Boolean(session) && profileLoaded);
   const header = { ...stackHeaderFor(c), headerShown: true };
 
   return (
