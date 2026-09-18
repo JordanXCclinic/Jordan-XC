@@ -613,6 +613,54 @@ end $$;
 reset role;
 
 -- ---------------------------------------------------------------------------
+-- Push recipients (0012).
+-- ---------------------------------------------------------------------------
+
+reset role;
+update profiles set push_token = 'ExponentPushToken[clinic-athlete]'
+ where id = '22222222-2222-2222-2222-222222222222';
+update profiles set push_token = 'ExponentPushToken[solo]',
+       notification_prefs = '{"announcements": true}'::jsonb
+ where id = 'cccccccc-cccc-cccc-cccc-cccccccccccc';
+
+do $$
+declare n_clinic int; n_private int;
+begin
+  select count(*) into n_clinic from push_recipients('clinic', 'announcements');
+  select count(*) into n_private from push_recipients('private', 'announcements');
+  if n_clinic = 1 and n_private = 1
+  then raise notice 'PASS: a push goes to the programme it was addressed to';
+  else raise notice 'FAIL: recipients wrong (clinic %, private %)', n_clinic, n_private;
+  end if;
+end $$;
+
+-- A category switched off means no push, even though the row stays readable.
+update profiles set notification_prefs = '{"announcements": false}'::jsonb
+ where id = '22222222-2222-2222-2222-222222222222';
+do $$
+declare n int;
+begin
+  select count(*) into n from push_recipients('clinic', 'announcements');
+  if n = 0 then raise notice 'PASS: switching a category off stops the push';
+  else raise notice 'FAIL: % recipient(s) after switching the category off', n;
+  end if;
+end $$;
+
+-- The token list must not be reachable with the app's own key: it would hand
+-- any signed-in athlete every family's push token.
+set role authenticated;
+select set_config('request.jwt.claim.sub', :athlete, false);
+do $$
+begin
+  perform push_recipients('clinic', 'announcements');
+  raise notice 'FAIL: a signed-in athlete enumerated the clinic''s push tokens';
+exception when others then
+  raise notice 'PASS: push tokens are not reachable with the app key (%)', sqlerrm;
+end $$;
+
+reset role;
+
+-- ---------------------------------------------------------------------------
 -- Account deletion, export, and the intake-form access trail (0007).
 --
 -- Apple will not approve an app that creates accounts but cannot delete them,

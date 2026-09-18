@@ -1,3 +1,5 @@
+import type { NotificationPrefs } from './notifications';
+
 export type AppRole = 'admin' | 'coach' | 'athlete' | 'private_client' | 'parent';
 
 export type Audience = 'everyone' | 'clinic' | 'private' | 'coaches';
@@ -12,10 +14,12 @@ export type Profile = {
   phone: string | null;
   graduation_year: number | null;
   onboarded_at: string | null;
+  push_token: string | null;
+  notification_prefs: NotificationPrefs | null;
 };
 
 export const PROFILE_COLUMNS =
-  'id, full_name, role, date_of_birth, phone, graduation_year, onboarded_at';
+  'id, full_name, role, date_of_birth, phone, graduation_year, onboarded_at, push_token, notification_prefs';
 
 /**
  * The intake form. Everything here is optional except the athlete it belongs to.

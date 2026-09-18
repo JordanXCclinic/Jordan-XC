@@ -8,16 +8,29 @@ import { Ionicons } from '@expo/vector-icons';
 import { Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Button } from '../components/Button';
 import { Card, ListRow } from '../components/Card';
+import { SwitchRow } from '../components/Field';
 import { Screen, SectionHeader } from '../components/Screen';
 import { useAuth } from '../lib/auth';
 import { roleLabel } from '../lib/format';
 import { PRIVACY_POLICY_URL, SUPPORT_EMAIL, TERMS_URL, isPrivateRelay, providerLabel } from '../lib/legal';
+import {
+  DEFAULT_PREFS,
+  PREF_LABELS,
+  disableNotifications,
+  enableNotifications,
+  savePrefs,
+  type NotificationPrefs,
+} from '../lib/notifications';
 import { supabase } from '../lib/supabase';
 import { colors, radius, spacing, type } from '../lib/theme';
 import { CLINIC_URL } from './sign-in';
 
 export default function Settings() {
-  const { profile, session, signOut } = useAuth();
+  const { profile, session, signOut, refreshProfile } = useAuth();
+  const [pushOn, setPushOn] = useState(Boolean(profile?.push_token));
+  const [prefs, setPrefs] = useState<NotificationPrefs>(profile?.notification_prefs ?? DEFAULT_PREFS);
+  const [pushBusy, setPushBusy] = useState(false);
+  const [pushError, setPushError] = useState<string | null>(null);
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<string | null>(null);
@@ -26,6 +39,40 @@ export default function Settings() {
   const email = session?.user?.email ?? null;
   const provider = session?.user?.app_metadata?.provider as string | undefined;
   const relay = isPrivateRelay(email);
+
+  async function togglePush(next: boolean) {
+    if (!profile) return;
+    setPushBusy(true);
+    setPushError(null);
+
+    if (!next) {
+      const problem = await disableNotifications(profile.id);
+      setPushBusy(false);
+      if (problem) setPushError(problem);
+      else setPushOn(false);
+      await refreshProfile();
+      return;
+    }
+
+    // Permission is only ever asked for here, on a deliberate tap — never on
+    // launch, where iOS would burn the single prompt it allows.
+    const { ok, error: problem } = await enableNotifications(profile.id);
+    setPushBusy(false);
+    setPushOn(ok);
+    if (problem) setPushError(problem);
+    await refreshProfile();
+  }
+
+  async function togglePref(key: keyof NotificationPrefs, value: boolean) {
+    if (!profile) return;
+    const next = { ...prefs, [key]: value };
+    setPrefs(next);
+    const problem = await savePrefs(profile.id, next);
+    if (problem) {
+      setPrefs(prefs);
+      setPushError(problem);
+    }
+  }
 
   async function exportData() {
     setBusy(true);
@@ -130,6 +177,36 @@ export default function Settings() {
         subtitle="Registration, payment, and waivers"
         onPress={() => void WebBrowser.openBrowserAsync(CLINIC_URL)}
       />
+
+      <SectionHeader title="Notifications" />
+      <Card>
+        <SwitchRow
+          label="Notifications on this phone"
+          hint={
+            pushBusy
+              ? 'Just a moment…'
+              : 'Practice changes are the reason this exists. You can pick which ones below.'
+          }
+          value={pushOn}
+          onValueChange={(next) => void togglePush(next)}
+        />
+
+        {pushOn ? (
+          <View style={styles.prefs}>
+            {(Object.keys(PREF_LABELS) as (keyof NotificationPrefs)[]).map((key) => (
+              <SwitchRow
+                key={key}
+                label={PREF_LABELS[key].title}
+                hint={PREF_LABELS[key].hint}
+                value={prefs[key]}
+                onValueChange={(next) => void togglePref(key, next)}
+              />
+            ))}
+          </View>
+        ) : null}
+
+        {pushError ? <Text style={styles.error}>{pushError}</Text> : null}
+      </Card>
 
       <SectionHeader title="Your data" />
       <Card>
@@ -254,6 +331,13 @@ const styles = StyleSheet.create({
   },
   relayText: { ...type.caption, color: colors.warning, flex: 1, lineHeight: 17 },
   action: { marginTop: spacing.lg },
+  prefs: {
+    gap: spacing.lg,
+    marginTop: spacing.lg,
+    paddingTop: spacing.lg,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.border,
+  },
   note: { ...type.caption, color: colors.success, marginTop: spacing.md },
   error: { ...type.caption, color: colors.danger, marginTop: spacing.md },
   signOut: {

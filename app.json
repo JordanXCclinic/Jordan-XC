@@ -58,9 +58,19 @@
           "photosPermission": "Coaches choose photos from this device to share with the clinic.",
           "cameraPermission": false
         }
+      ],
+      [
+        "expo-notifications",
+        {
+          "color": "#003482",
+          "defaultChannel": "default"
+        }
       ]
     ],
     "description": "The schedule, training, and clinic news hub for athletes and families of the Jordan Cross Country Clinic in Birmingham, Alabama.",
-    "privacy": "public"
+    "privacy": "public",
+    "notification": {
+      "iosDisplayInForeground": false
+    }
   }
 }
