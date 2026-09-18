@@ -13,8 +13,9 @@ news, photos, and a time to meet with the coach.
 1. Download the app and sign in with **Apple** or **Google**. There are no passwords.
 2. Enter the **clinic code** issued after registering on the website. Athletes and
    parents each get their own code, and either can be redeemed first.
-3. Fill in the profile: school, grade, personal bests, goals, current and past
-   injuries, and an emergency contact.
+3. Fill in the profile: school, grade, personal bests, goals, and an emergency
+   contact. No health information is collected — the coach handles that with
+   parents directly.
 
 The code carries the role, so it is the code — not the person — that decides
 whether someone lands in the athlete app or the coach hub.
@@ -89,8 +90,8 @@ athlete, parent, or another coach — comes in through a code.
 
 `supabase/tests/` holds the security tests, which run against a plain Postgres
 with no Supabase installed. They cover the boundaries that matter: role
-escalation, code reuse, who can see an athlete's injury record, and that
-deleting an account really deletes it. See
+escalation, code reuse, who can see an athlete's intake form, that the schema
+holds no health data, and that deleting an account really deletes it. See
 [`supabase/tests/README.md`](supabase/tests/README.md).
 
 ```sh

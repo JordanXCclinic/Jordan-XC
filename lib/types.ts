@@ -20,17 +20,15 @@ export const PROFILE_COLUMNS =
 /**
  * The intake form. Everything here is optional except the athlete it belongs to.
  *
- * Injuries are the only health information the app holds. Medical conditions,
- * allergies and medication are gathered by the coach directly from parents and
- * deliberately never enter this database.
+ * There is deliberately no health information on it — no injuries, conditions,
+ * allergies or medication. The coach handles all of that with parents directly,
+ * so the app holds none of it.
  */
 export type AthleteProfile = {
   athlete_id: string;
   school: string | null;
   grade: string | null;
   goals: string | null;
-  current_injuries: string | null;
-  injury_history: string | null;
   emergency_contact_name: string | null;
   emergency_contact_phone: string | null;
   emergency_contact_relationship: string | null;
@@ -38,7 +36,7 @@ export type AthleteProfile = {
 };
 
 export const ATHLETE_PROFILE_COLUMNS =
-  'athlete_id, school, grade, goals, current_injuries, injury_history, emergency_contact_name, emergency_contact_phone, emergency_contact_relationship, updated_at';
+  'athlete_id, school, grade, goals, emergency_contact_name, emergency_contact_phone, emergency_contact_relationship, updated_at';
 
 export type PersonalBest = {
   id: string;

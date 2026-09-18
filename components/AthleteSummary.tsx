@@ -94,31 +94,12 @@ export function AthleteSummary({ athleteId }: { athleteId: string }) {
         </Card>
       ) : null}
 
-      {profile?.current_injuries || profile?.injury_history ? (
-        <Card accent="danger">
-          <View style={styles.privateHead}>
-            <Ionicons name="lock-closed" size={15} color={colors.danger} />
-            <Text style={styles.cardTitle}>Injuries</Text>
-          </View>
-          {/* What hurts now comes first: it is what changes today's session. */}
-          {profile.current_injuries ? (
-            <View style={styles.block}>
-              <Text style={styles.blockLabel}>Right now</Text>
-              <Text style={styles.bodyStrong}>{profile.current_injuries}</Text>
-            </View>
-          ) : null}
-          {profile.injury_history ? (
-            <View style={styles.block}>
-              <Text style={styles.blockLabel}>Previously</Text>
-              <Text style={styles.body}>{profile.injury_history}</Text>
-            </View>
-          ) : null}
-        </Card>
-      ) : null}
-
       {profile?.emergency_contact_name ? (
         <Card accent="primary">
-          <Text style={styles.cardTitle}>Emergency contact</Text>
+          <View style={styles.privateHead}>
+            <Ionicons name="lock-closed" size={15} color={colors.primary} />
+            <Text style={styles.cardTitle}>Emergency contact</Text>
+          </View>
           <Text style={styles.contactName}>{profile.emergency_contact_name}</Text>
           {profile.emergency_contact_relationship ? (
             <Text style={styles.contactMeta}>{profile.emergency_contact_relationship}</Text>
@@ -152,7 +133,6 @@ function Fact({ label, value }: { label: string; value: string }) {
 const styles = StyleSheet.create({
   cardTitle: { ...type.heading, color: colors.text },
   body: { ...type.body, color: colors.textMuted },
-  bodyStrong: { ...type.body, color: colors.text, fontWeight: '600' },
   facts: { gap: spacing.md, marginTop: spacing.md },
   fact: { gap: 2 },
   factLabel: { ...type.caption, color: colors.textFaint },

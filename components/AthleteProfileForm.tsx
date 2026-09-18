@@ -30,8 +30,6 @@ type Draft = {
   school: string;
   grade: string | null;
   goals: string;
-  current_injuries: string;
-  injury_history: string;
   emergency_contact_name: string;
   emergency_contact_phone: string;
   emergency_contact_relationship: string;
@@ -41,8 +39,6 @@ const EMPTY: Draft = {
   school: '',
   grade: null,
   goals: '',
-  current_injuries: '',
-  injury_history: '',
   emergency_contact_name: '',
   emergency_contact_phone: '',
   emergency_contact_relationship: '',
@@ -89,8 +85,6 @@ export function AthleteProfileForm({ athleteId, athleteName, submitLabel, onSave
         school: existing.school ?? '',
         grade: existing.grade,
         goals: existing.goals ?? '',
-        current_injuries: existing.current_injuries ?? '',
-        injury_history: existing.injury_history ?? '',
         emergency_contact_name: existing.emergency_contact_name ?? '',
         emergency_contact_phone: existing.emergency_contact_phone ?? '',
         emergency_contact_relationship: existing.emergency_contact_relationship ?? '',
@@ -141,8 +135,6 @@ export function AthleteProfileForm({ athleteId, athleteName, submitLabel, onSave
         school: draft.school.trim() || null,
         grade: draft.grade,
         goals: draft.goals.trim() || null,
-        current_injuries: draft.current_injuries.trim() || null,
-        injury_history: draft.injury_history.trim() || null,
         emergency_contact_name: draft.emergency_contact_name.trim() || null,
         emergency_contact_phone: draft.emergency_contact_phone.trim() || null,
         emergency_contact_relationship: draft.emergency_contact_relationship.trim() || null,
@@ -243,42 +235,16 @@ export function AthleteProfileForm({ athleteId, athleteName, submitLabel, onSave
         </View>
       </Card>
 
-      <Card accent="danger">
-        <View style={styles.privateHeading}>
-          <Ionicons name="lock-closed" size={16} color={colors.danger} />
-          <Text style={styles.cardTitle}>Injuries</Text>
-        </View>
-        <Text style={styles.cardHint}>
-          {self
-            ? 'Only you, your parent or guardian, and clinic staff can see this. It is here so the coaches know what to change about your training.'
-            : `Only ${firstName(athleteName)}, their guardians, and clinic staff can see this. It is here so the coaches know what to change about their training.`}
-        </Text>
-        <View style={styles.fields}>
-          <TextField
-            label="Anything bothering you right now"
-            value={draft.current_injuries}
-            onChangeText={(next) => set('current_injuries', next)}
-            placeholder="Left achilles has been sore since the last time trial."
-            hint="Tell a coach in person too, before the next practice."
-            multiline
-          />
-          <TextField
-            label="Injuries in the past"
-            value={draft.injury_history}
-            onChangeText={(next) => set('injury_history', next)}
-            placeholder="Shin splints last fall, cleared in December."
-            multiline
-          />
-        </View>
-        <Text style={styles.cardHint}>
-          Allergies, medication, and any medical condition are handled by Coach Will
-          directly with your parent or guardian, not through the app.
-        </Text>
-      </Card>
-
       <Card accent="primary">
-        <Text style={styles.cardTitle}>Emergency contact</Text>
-        <Text style={styles.cardHint}>Who the coaches call first if something happens.</Text>
+        <View style={styles.privateHeading}>
+          <Ionicons name="lock-closed" size={16} color={colors.primary} />
+          <Text style={styles.cardTitle}>Emergency contact</Text>
+        </View>
+        <Text style={styles.cardHint}>
+          Who the coaches call first if something happens. Only{' '}
+          {self ? 'you' : firstName(athleteName)}, {self ? 'your' : 'their'} parent or guardian,
+          and clinic staff can see it.
+        </Text>
         <View style={styles.fields}>
           <TextField
             label="Name"

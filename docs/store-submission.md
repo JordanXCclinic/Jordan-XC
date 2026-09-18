@@ -56,8 +56,8 @@ they will flag hidden functionality. Give them a staff login.
 | Photo library permission string | `app.json` → expo-image-picker plugin | Done |
 | No location, microphone, or contacts access | `app.json` → `blockedPermissions` | Done |
 | Export compliance declared (skips the question each upload) | `ITSAppUsesNonExemptEncryption: false` | Done |
-| Injury record access is logged | `staff_view_athlete_profile()` | Done, tested |
-| No medical conditions, allergies or medication stored | `0008`, guarded by a test | Done, tested |
+| Intake form access by staff is logged | `staff_view_athlete_profile()` | Done, tested |
+| **No health data stored at all** | `0008` + `0009`, guarded by a test | Done, tested |
 | One family cannot read another's records | RLS + 38 tests | Done, tested |
 
 ---
@@ -89,8 +89,8 @@ user's identity** and **not used for tracking**.
 | Contact info — name | Yes | App functionality |
 | Contact info — email | Yes | App functionality |
 | Contact info — phone | Yes (optional) | App functionality |
-| **Health & fitness — health** | **Yes** | App functionality |
-| **Health & fitness — fitness** | **Yes** | App functionality |
+| Health & fitness — **health** | **No** — see below | — |
+| Health & fitness — **fitness** | **Yes** | App functionality |
 | User content — photos | Yes | App functionality |
 | User content — other (training notes, goals) | Yes | App functionality |
 | Identifiers — user ID | Yes | App functionality |
@@ -101,14 +101,18 @@ analytics: No.** (These stay "No" only while the app ships without an analytics
 or crash-reporting SDK. Adding Sentry changes the diagnostics answer — update
 this table and the policy if you add it.)
 
-Declare **health data** honestly, and note that narrowing what the app collects
-does **not** change this answer. The intake form no longer holds medical
-conditions, allergies, or medication — but it does hold current and past
-injuries, and an injury an athlete types in is health information under both
-Apple's and Google's definitions. The answer stays **Yes**.
+**Health is "No" only because the app genuinely holds none.** There is no field
+anywhere for injuries, medical conditions, allergies, or medication — the coach
+handles all of that with parents off the app, and a test asserts the database
+has nowhere to put it. If a health field is ever added back, this answer must
+change to "Yes" in the same commit.
 
-Understating it is worse than declaring it: the field is plainly in the app, and
-a reviewer will find it.
+**Fitness stays "Yes."** Personal best race times and training logs (distance,
+duration, and how hard a session felt) are fitness data under both stores'
+definitions, and understating that would be worse than declaring it.
+
+The emergency contact is a third party's name and phone number, declared under
+contact info along with the athlete's own.
 
 ---
 
@@ -125,7 +129,7 @@ Play Console → App content → Data safety. The same picture, in Google's word
 | Name | Yes | No | Required | App functionality |
 | Email address | Yes | No | Required | App functionality, account management |
 | Phone number | Yes | No | Optional | App functionality |
-| **Health info** | **Yes** | No | Optional | App functionality |
+| **Health info** | **No** | — | — | Not collected — see above |
 | **Fitness info** | **Yes** | No | Optional | App functionality |
 | Photos | Yes | No | Optional | App functionality |
 | Other user-generated content | Yes | No | Optional | App functionality |
