@@ -63,21 +63,25 @@ export type Practice = {
   notes: string | null;
   status: 'scheduled' | 'moved' | 'cancelled';
   audience: Audience;
+  /** When set, this is for that athlete alone and `audience` is ignored. */
+  audience_athlete_id: string | null;
 };
 
 export const PRACTICE_COLUMNS =
-  'id, starts_at, ends_at, location_name, meeting_point, notes, status, audience';
+  'id, starts_at, ends_at, location_name, meeting_point, notes, status, audience, audience_athlete_id';
 
 export type Announcement = {
   id: string;
   title: string;
   body: string;
   audience: Audience;
+  audience_athlete_id: string | null;
   published_at: string | null;
   created_at: string;
 };
 
-export const ANNOUNCEMENT_COLUMNS = 'id, title, body, audience, published_at, created_at';
+export const ANNOUNCEMENT_COLUMNS =
+  'id, title, body, audience, audience_athlete_id, published_at, created_at';
 
 export type Post = {
   id: string;

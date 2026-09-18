@@ -4,12 +4,13 @@ import { Alert, Platform, Pressable, StyleSheet, Text, View } from 'react-native
 import { Badge } from '../../../components/Badge';
 import { Button } from '../../../components/Button';
 import { Card } from '../../../components/Card';
+import { AudiencePicker } from '../../../components/AudiencePicker';
 import { TextField } from '../../../components/Field';
 import { EmptyState, LoadingState, Screen, SectionHeader } from '../../../components/Screen';
 import { useAuth } from '../../../lib/auth';
 import { formatDate } from '../../../lib/format';
 import { isSupabaseConfigured, supabase } from '../../../lib/supabase';
-import { POST_COLUMNS, type Post } from '../../../lib/types';
+import { POST_COLUMNS, type Audience, type Post } from '../../../lib/types';
 import { spacing, type, type Palette } from '../../../lib/theme';
 import { useTheme, useThemedStyles } from '../../../lib/appearance';
 
@@ -40,6 +41,8 @@ export default function CoachPosts() {
   const [body, setBody] = useState('');
   const [heroUrl, setHeroUrl] = useState('');
   const [videoUrl, setVideoUrl] = useState('');
+  const [audience, setAudience] = useState<Audience>('everyone');
+  const [audienceAthlete, setAudienceAthlete] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -81,6 +84,8 @@ export default function CoachPosts() {
       category: category.trim() || null,
       hero_image_url: heroUrl.trim() || null,
       video_url: videoUrl.trim() || null,
+      audience,
+      audience_athlete_id: audienceAthlete,
       published_at: publish ? new Date().toISOString() : null,
     };
 
@@ -106,6 +111,8 @@ export default function CoachPosts() {
     setBody('');
     setHeroUrl('');
     setVideoUrl('');
+    setAudience('everyone');
+    setAudienceAthlete(null);
     await load();
   }
 
@@ -179,6 +186,12 @@ export default function CoachPosts() {
             placeholder="https://jordanxcclinic.com/…"
             hint="Optional. A public link — images on the clinic site work well."
             autoCapitalize="none"
+          />
+          <AudiencePicker
+            audience={audience}
+            onAudienceChange={setAudience}
+            athleteId={audienceAthlete}
+            onAthleteChange={setAudienceAthlete}
           />
           <TextField
             label="Video URL"

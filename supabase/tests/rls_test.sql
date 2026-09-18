@@ -613,6 +613,105 @@ end $$;
 reset role;
 
 -- ---------------------------------------------------------------------------
+-- One-on-one isolation between private clients (0013).
+--
+-- solo (Lena) and solo2 (Maya) are both one-on-one clients. They pay for
+-- individual coaching and have no connection to each other, so content for one
+-- must never reach the other — the failure the single 'private' bucket had.
+-- ---------------------------------------------------------------------------
+
+reset role;
+
+\set solo2 '''dddddddd-dddd-dddd-dddd-dddddddddddd'''
+\set soloparent '''dddddddd-1111-1111-1111-111111111111'''
+insert into auth.users (id) values (:solo2), (:soloparent);
+insert into profiles (id, full_name, role) values
+  (:solo2, 'Maya Ellis', 'private_client'),
+  (:soloparent, 'Jo Marsh', 'parent');
+insert into guardian_links (athlete_id, guardian_id) values (:solo, :soloparent);
+
+insert into announcements (id, author_id, title, body, audience, audience_athlete_id, published_at) values
+  ('e0000000-0000-0000-0000-000000000001', :coach, 'For Lena', 'x', 'private', :solo,  now()),
+  ('e0000000-0000-0000-0000-000000000002', :coach, 'For Maya', 'x', 'private', :solo2, now());
+
+insert into practices (id, starts_at, location_name, created_by, audience, audience_athlete_id)
+values ('e0000000-0000-0000-0000-000000000011', now() + interval '2 days',
+        'Track — Lena only', :coach, 'private', :solo);
+
+set role authenticated;
+
+select set_config('request.jwt.claim.sub', :solo, false);
+do $$
+declare n_mine int; n_theirs int; n_practice int;
+begin
+  select count(*) into n_mine   from announcements where id = 'e0000000-0000-0000-0000-000000000001';
+  select count(*) into n_theirs from announcements where id = 'e0000000-0000-0000-0000-000000000002';
+  select count(*) into n_practice from practices where id = 'e0000000-0000-0000-0000-000000000011';
+  if n_mine = 1 and n_theirs = 0 and n_practice = 1
+  then raise notice 'PASS: a one-on-one client sees their own content and not another client''s';
+  else raise notice 'FAIL: mine %, theirs %, practice %', n_mine, n_theirs, n_practice;
+  end if;
+end $$;
+
+select set_config('request.jwt.claim.sub', :solo2, false);
+do $$
+declare n_mine int; n_theirs int; n_practice int;
+begin
+  select count(*) into n_mine   from announcements where id = 'e0000000-0000-0000-0000-000000000002';
+  select count(*) into n_theirs from announcements where id = 'e0000000-0000-0000-0000-000000000001';
+  select count(*) into n_practice from practices where id = 'e0000000-0000-0000-0000-000000000011';
+  if n_mine = 1 and n_theirs = 0 and n_practice = 0
+  then raise notice 'PASS: the isolation holds in the other direction too';
+  else raise notice 'FAIL: mine %, theirs %, practice %', n_mine, n_theirs, n_practice;
+  end if;
+end $$;
+
+-- A private client's own parent still sees their athlete's content.
+select set_config('request.jwt.claim.sub', :soloparent, false);
+do $$
+declare n_mine int; n_theirs int;
+begin
+  select count(*) into n_mine   from announcements where id = 'e0000000-0000-0000-0000-000000000001';
+  select count(*) into n_theirs from announcements where id = 'e0000000-0000-0000-0000-000000000002';
+  if n_mine = 1 and n_theirs = 0
+  then raise notice 'PASS: a one-on-one client''s parent sees their athlete''s content and no other client''s';
+  else raise notice 'FAIL: parent saw mine %, theirs %', n_mine, n_theirs;
+  end if;
+end $$;
+
+-- And a clinic athlete sees neither.
+select set_config('request.jwt.claim.sub', :newathlete, false);
+do $$
+declare n int;
+begin
+  select count(*) into n from announcements
+   where id in ('e0000000-0000-0000-0000-000000000001', 'e0000000-0000-0000-0000-000000000002');
+  if n = 0 then raise notice 'PASS: a clinic athlete sees no one-on-one content at all';
+  else raise notice 'FAIL: a clinic athlete saw % private announcements', n;
+  end if;
+end $$;
+
+-- A push for one client must not reach the other.
+reset role;
+update profiles set push_token = 'ExponentPushToken[maya]',
+       notification_prefs = '{"announcements": true}'::jsonb where id = :solo2;
+do $$
+declare n_for_maya int; n_for_lena int;
+begin
+  select count(*) into n_for_maya from push_recipients('private', 'announcements',
+                                     'dddddddd-dddd-dddd-dddd-dddddddddddd');
+  select count(*) into n_for_lena from push_recipients('private', 'announcements',
+                                     'cccccccc-cccc-cccc-cccc-cccccccccccc');
+  if n_for_maya = 1 and n_for_lena = 0
+  then raise notice 'PASS: a push for one client does not reach the other';
+  else raise notice 'FAIL: push reach wrong (maya %, lena %)', n_for_maya, n_for_lena;
+  end if;
+end $$;
+
+set role authenticated;
+reset role;
+
+-- ---------------------------------------------------------------------------
 -- Push recipients (0012).
 -- ---------------------------------------------------------------------------
 
@@ -623,12 +722,15 @@ update profiles set push_token = 'ExponentPushToken[solo]',
        notification_prefs = '{"announcements": true}'::jsonb
  where id = 'cccccccc-cccc-cccc-cccc-cccccccccccc';
 
+-- Without a named athlete the audience still decides it. Two one-on-one
+-- clients are subscribed by this point, and a broadcast to the programme
+-- reaches both of them; the clinic athlete is not one of them.
 do $$
 declare n_clinic int; n_private int;
 begin
   select count(*) into n_clinic from push_recipients('clinic', 'announcements');
   select count(*) into n_private from push_recipients('private', 'announcements');
-  if n_clinic = 1 and n_private = 1
+  if n_clinic = 1 and n_private = 2
   then raise notice 'PASS: a push goes to the programme it was addressed to';
   else raise notice 'FAIL: recipients wrong (clinic %, private %)', n_clinic, n_private;
   end if;

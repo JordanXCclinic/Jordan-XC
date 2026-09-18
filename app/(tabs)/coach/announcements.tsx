@@ -4,7 +4,8 @@ import { Alert, Platform, Pressable, StyleSheet, Text, View } from 'react-native
 import { Badge } from '../../../components/Badge';
 import { Button } from '../../../components/Button';
 import { Card } from '../../../components/Card';
-import { ChipSelect, TextField } from '../../../components/Field';
+import { AudiencePicker } from '../../../components/AudiencePicker';
+import { TextField } from '../../../components/Field';
 import { EmptyState, LoadingState, Screen, SectionHeader } from '../../../components/Screen';
 import { useAuth } from '../../../lib/auth';
 import { formatRelative } from '../../../lib/format';
@@ -17,11 +18,6 @@ import { ANNOUNCEMENT_COLUMNS,
 import { spacing, type, type Palette } from '../../../lib/theme';
 import { useTheme, useThemedStyles } from '../../../lib/appearance';
 
-const AUDIENCES = (Object.keys(AUDIENCE_LABELS) as Audience[]).map((value) => ({
-  value,
-  label: AUDIENCE_LABELS[value],
-}));
-
 export default function CoachAnnouncements() {
 
   const c = useTheme();
@@ -30,11 +26,13 @@ export default function CoachAnnouncements() {
 
   const { profile } = useAuth();
   const [items, setItems] = useState<Announcement[]>([]);
+  const [targetNames, setTargetNames] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
 
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
   const [audience, setAudience] = useState<Audience>('everyone');
+  const [audienceAthlete, setAudienceAthlete] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -50,7 +48,23 @@ export default function CoachAnnouncements() {
       .select(ANNOUNCEMENT_COLUMNS)
       .order('created_at', { ascending: false })
       .limit(50);
-    setItems((data as Announcement[] | null) ?? []);
+    const rows = (data as Announcement[] | null) ?? [];
+    setItems(rows);
+
+    const targets = [
+      ...new Set(rows.map((row) => row.audience_athlete_id).filter((id): id is string => Boolean(id))),
+    ];
+    if (targets.length > 0) {
+      const { data: people } = await supabase
+        .from('profiles')
+        .select('id, full_name')
+        .in('id', targets);
+      const names: Record<string, string> = {};
+      for (const person of (people as { id: string; full_name: string }[] | null) ?? []) {
+        names[person.id] = person.full_name;
+      }
+      setTargetNames(names);
+    }
     setLoading(false);
   }, []);
 
@@ -73,6 +87,7 @@ export default function CoachAnnouncements() {
       title: title.trim(),
       body: body.trim(),
       audience,
+      audience_athlete_id: audienceAthlete,
       published_at: publish ? new Date().toISOString() : null,
     });
 
@@ -137,11 +152,12 @@ export default function CoachAnnouncements() {
             multiline
             required
           />
-          <ChipSelect
-            label="Who sees it"
-            options={AUDIENCES}
-            value={audience}
-            onChange={setAudience}
+          <AudiencePicker
+            audience={audience}
+            onAudienceChange={setAudience}
+            athleteId={audienceAthlete}
+            onAthleteChange={setAudienceAthlete}
+            allowCoachesOnly={false}
           />
         </View>
 
@@ -185,7 +201,11 @@ export default function CoachAnnouncements() {
               <Text style={styles.itemBody}>{item.body}</Text>
 
               <View style={styles.metaRow}>
-                <Text style={styles.meta}>{AUDIENCE_LABELS[item.audience]}</Text>
+                <Text style={styles.meta}>
+                  {item.audience_athlete_id
+                    ? `For ${targetNames[item.audience_athlete_id] ?? 'one client'}`
+                    : AUDIENCE_LABELS[item.audience]}
+                </Text>
                 <Text style={styles.meta}>
                   {formatRelative(item.published_at ?? item.created_at)}
                 </Text>

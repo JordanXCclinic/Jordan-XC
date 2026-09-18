@@ -5,7 +5,8 @@ import { Alert, Platform, Pressable, StyleSheet, Text, View } from 'react-native
 import { Badge } from '../../../components/Badge';
 import { Button } from '../../../components/Button';
 import { Card } from '../../../components/Card';
-import { ChipSelect, TextField } from '../../../components/Field';
+import { AudiencePicker } from '../../../components/AudiencePicker';
+import { TextField } from '../../../components/Field';
 import { DateTimeField } from '../../../components/DateTimeField';
 import { EmptyState, LoadingState, Screen, SectionHeader } from '../../../components/Screen';
 import { useAuth } from '../../../lib/auth';
@@ -18,11 +19,6 @@ import { AUDIENCE_LABELS,
 } from '../../../lib/types';
 import { spacing, type, type Palette } from '../../../lib/theme';
 import { useTheme, useThemedStyles } from '../../../lib/appearance';
-
-const AUDIENCES = (Object.keys(AUDIENCE_LABELS) as Audience[]).map((value) => ({
-  value,
-  label: AUDIENCE_LABELS[value],
-}));
 
 /** Next practice defaults to tomorrow morning, which is what usually gets typed. */
 function defaultStart(): Date {
@@ -49,6 +45,7 @@ export default function CoachPractices() {
   const [meetingPoint, setMeetingPoint] = useState('');
   const [notes, setNotes] = useState('');
   const [audience, setAudience] = useState<Audience>('clinic');
+  const [audienceAthlete, setAudienceAthlete] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -78,6 +75,7 @@ export default function CoachPractices() {
     setMeetingPoint('');
     setNotes('');
     setAudience('clinic');
+    setAudienceAthlete(null);
     setStartsAt(defaultStart());
     setError(null);
   }
@@ -90,6 +88,7 @@ export default function CoachPractices() {
     setMeetingPoint(practice.meeting_point ?? '');
     setNotes(practice.notes ?? '');
     setAudience(practice.audience);
+    setAudienceAthlete(practice.audience_athlete_id);
     setError(null);
   }
 
@@ -109,6 +108,7 @@ export default function CoachPractices() {
       meeting_point: meetingPoint.trim() || null,
       notes: notes.trim() || null,
       audience,
+      audience_athlete_id: audienceAthlete,
     };
 
     const { error: writeError } = editingId
@@ -179,7 +179,13 @@ export default function CoachPractices() {
             placeholder="Bring trail shoes and a full water bottle."
             multiline
           />
-          <ChipSelect label="Who it is for" options={AUDIENCES} value={audience} onChange={setAudience} />
+          <AudiencePicker
+            audience={audience}
+            onAudienceChange={setAudience}
+            athleteId={audienceAthlete}
+            onAthleteChange={setAudienceAthlete}
+            allowCoachesOnly={false}
+          />
         </View>
 
         {error ? <Text style={styles.error}>{error}</Text> : null}
