@@ -440,6 +440,141 @@ end $$;
 reset role;
 
 -- ---------------------------------------------------------------------------
+-- Audience scoping and parent-entered logs (0010).
+--
+-- athlete 22… is a clinic athlete with parent 33…. newathlete 55… is also a
+-- clinic athlete. A one-on-one client is added here so the two programmes can
+-- be tested against each other, which is the isolation that matters.
+-- ---------------------------------------------------------------------------
+
+reset role;
+
+\set solo '''cccccccc-cccc-cccc-cccc-cccccccccccc'''
+insert into auth.users (id) values (:solo);
+insert into profiles (id, full_name, role) values (:solo, 'Lena Marsh', 'private_client');
+
+insert into announcements (id, author_id, title, body, audience, published_at) values
+  ('d0000000-0000-0000-0000-000000000001', :coach, 'Clinic news',   'x', 'clinic',   now()),
+  ('d0000000-0000-0000-0000-000000000002', :coach, 'Private note',  'x', 'private',  now()),
+  ('d0000000-0000-0000-0000-000000000003', :coach, 'Staff only',    'x', 'coaches',  now()),
+  ('d0000000-0000-0000-0000-000000000004', :coach, 'For everyone',  'x', 'everyone', now());
+
+insert into practices (id, starts_at, location_name, created_by, audience) values
+  ('d0000000-0000-0000-0000-000000000011', now() + interval '2 days', 'Jemison Trail', :coach, 'clinic'),
+  ('d0000000-0000-0000-0000-000000000012', now() + interval '3 days', 'Track',         :coach, 'private');
+
+set role authenticated;
+
+-- A clinic athlete sees clinic and everyone, and neither the private content
+-- nor anything marked for staff.
+select set_config('request.jwt.claim.sub', :athlete, false);
+do $$
+declare n_clinic int; n_private int; n_staff int; n_all int;
+begin
+  select count(*) into n_clinic  from announcements where audience = 'clinic';
+  select count(*) into n_private from announcements where audience = 'private';
+  select count(*) into n_staff   from announcements where audience = 'coaches';
+  select count(*) into n_all     from announcements where audience = 'everyone';
+  if n_clinic = 1 and n_private = 0 and n_staff = 0 and n_all = 1
+  then raise notice 'PASS: a clinic athlete sees clinic and everyone, not private or staff';
+  else raise notice 'FAIL: clinic athlete saw clinic %, private %, staff %, everyone %',
+       n_clinic, n_private, n_staff, n_all;
+  end if;
+end $$;
+
+-- The isolation the clinic actually cares about, in both directions.
+select set_config('request.jwt.claim.sub', :solo, false);
+do $$
+declare n_clinic int; n_private int; n_practice_clinic int;
+begin
+  select count(*) into n_clinic  from announcements where audience = 'clinic';
+  select count(*) into n_private from announcements where audience = 'private';
+  select count(*) into n_practice_clinic from practices where audience = 'clinic';
+  if n_clinic = 0 and n_private = 1 and n_practice_clinic = 0
+  then raise notice 'PASS: a one-on-one client sees their own content and none of the clinic''s';
+  else raise notice 'FAIL: one-on-one saw clinic %, private %, clinic practices %',
+       n_clinic, n_private, n_practice_clinic;
+  end if;
+end $$;
+
+-- A parent inherits their own athlete's view, not the other programme's.
+select set_config('request.jwt.claim.sub', :parent, false);
+do $$
+declare n_clinic int; n_private int; n_staff int;
+begin
+  select count(*) into n_clinic  from announcements where audience = 'clinic';
+  select count(*) into n_private from announcements where audience = 'private';
+  select count(*) into n_staff   from announcements where audience = 'coaches';
+  if n_clinic = 1 and n_private = 0 and n_staff = 0
+  then raise notice 'PASS: a parent sees exactly what their own athlete sees';
+  else raise notice 'FAIL: parent saw clinic %, private %, staff %', n_clinic, n_private, n_staff;
+  end if;
+end $$;
+
+-- Staff see everything, including what is addressed only to them.
+select set_config('request.jwt.claim.sub', :coach, false);
+do $$
+declare n int;
+begin
+  select count(*) into n from announcements
+   where id in ('d0000000-0000-0000-0000-000000000001',
+                'd0000000-0000-0000-0000-000000000002',
+                'd0000000-0000-0000-0000-000000000003',
+                'd0000000-0000-0000-0000-000000000004');
+  if n = 4 then raise notice 'PASS: staff see every audience including their own';
+  else raise notice 'FAIL: coach saw % of 4 announcements', n;
+  end if;
+end $$;
+
+-- Parent-entered training logs.
+reset role;
+insert into training_plans (id, name, created_by)
+values ('d0000000-0000-0000-0000-000000000021', 'Summer base', :coach);
+insert into workouts (id, plan_id, week_number, day_of_week, title)
+values ('d0000000-0000-0000-0000-000000000022',
+        'd0000000-0000-0000-0000-000000000021', 1, 1, 'Easy 4 miles');
+
+set role authenticated;
+select set_config('request.jwt.claim.sub', :parent, false);
+do $$
+begin
+  insert into workout_logs (athlete_id, workout_id, logged_on, distance_miles)
+  values ('22222222-2222-2222-2222-222222222222',
+          'd0000000-0000-0000-0000-000000000022', current_date, 4);
+  raise notice 'PASS: a parent can log a run for their own athlete';
+exception when others then
+  raise notice 'FAIL: parent could not log for their athlete (%)', sqlerrm;
+end $$;
+
+-- Attribution is stamped server-side, so it cannot be passed off as the athlete's.
+reset role;
+do $$
+declare v_by uuid;
+begin
+  select logged_by into v_by from workout_logs
+   where athlete_id = '22222222-2222-2222-2222-222222222222'
+     and workout_id = 'd0000000-0000-0000-0000-000000000022';
+  if v_by = '33333333-3333-3333-3333-333333333333'
+  then raise notice 'PASS: the log records the parent who entered it';
+  else raise notice 'FAIL: logged_by was % rather than the parent', coalesce(v_by::text, 'null');
+  end if;
+end $$;
+
+-- Someone else's parent must not be able to write into an athlete's log.
+set role authenticated;
+select set_config('request.jwt.claim.sub', :newparent, false);
+do $$
+begin
+  insert into workout_logs (athlete_id, logged_on, distance_miles)
+  values ('22222222-2222-2222-2222-222222222222', current_date, 99);
+  raise notice 'FAIL: an unrelated parent logged a run for another athlete';
+exception when others then
+  raise notice 'PASS: an unrelated parent cannot log for another athlete (%)', sqlerrm;
+end $$;
+
+reset role;
+
+-- ---------------------------------------------------------------------------
 -- Account deletion, export, and the intake-form access trail (0007).
 --
 -- Apple will not approve an app that creates accounts but cannot delete them,

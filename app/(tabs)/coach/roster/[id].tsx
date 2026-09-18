@@ -23,6 +23,8 @@ export default function AthleteDetail() {
   const [guardians, setGuardians] = useState<Profile[]>([]);
   const [plan, setPlan] = useState<{ name: string; starts_on: string } | null>(null);
   const [logs, setLogs] = useState<WorkoutLog[]>([]);
+  /** Names for logs a parent entered, so the coach knows whose account it is. */
+  const [loggedByNames, setLoggedByNames] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
@@ -52,7 +54,32 @@ export default function AthleteDetail() {
       ]);
 
     setAthlete((row as Profile | null) ?? null);
-    setLogs((logRows as WorkoutLog[] | null) ?? []);
+
+    const logList = (logRows as WorkoutLog[] | null) ?? [];
+    setLogs(logList);
+
+    // Resolve only the entries somebody else wrote — a run the athlete logged
+    // themselves needs no attribution.
+    const enteredByOthers = [
+      ...new Set(
+        logList
+          .map((log) => log.logged_by)
+          .filter((who): who is string => Boolean(who) && who !== id)
+      ),
+    ];
+    if (enteredByOthers.length > 0) {
+      const { data: people } = await supabase
+        .from('profiles')
+        .select('id, full_name')
+        .in('id', enteredByOthers);
+      const names: Record<string, string> = {};
+      for (const person of (people as { id: string; full_name: string }[] | null) ?? []) {
+        names[person.id] = person.full_name;
+      }
+      setLoggedByNames(names);
+    } else {
+      setLoggedByNames({});
+    }
 
     const assigned = assignment as
       | { starts_on: string; training_plans: { name: string } | null }
@@ -193,6 +220,11 @@ export default function AthleteDetail() {
                 .join(' · ') || 'Marked done'}
             </Text>
             {log.notes ? <Text style={styles.logNotes}>{log.notes}</Text> : null}
+            {log.logged_by && log.logged_by !== athlete.id ? (
+              <Text style={styles.logBy}>
+                Entered by {loggedByNames[log.logged_by] ?? 'a parent'}
+              </Text>
+            ) : null}
           </Card>
         ))
       )}
@@ -215,4 +247,5 @@ const styles = StyleSheet.create({
   logDate: { ...type.bodyStrong, color: colors.text },
   logStats: { ...type.body, color: colors.primary, marginTop: spacing.xs },
   logNotes: { ...type.body, color: colors.textMuted, marginTop: spacing.xs },
+  logBy: { ...type.caption, color: colors.textFaint, marginTop: spacing.sm, fontStyle: 'italic' },
 });

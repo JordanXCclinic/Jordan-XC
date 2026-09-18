@@ -15,6 +15,7 @@ import {
   TRAINING_PLAN_COLUMNS,
   WORKOUT_COLUMNS,
   isAthlete,
+  isParent,
   type TrainingPlan,
   type Workout,
 } from '../../lib/types';
@@ -100,9 +101,12 @@ export default function Training() {
     [workouts, week]
   );
 
-  // Only an athlete logs their own training; a parent watching along cannot,
-  // and the database would refuse it anyway.
-  const canLog = isAthlete(role) && activeAthleteId === profile?.id;
+  // An athlete logs their own training, and a parent logs for the athlete they
+  // guard — plenty of these runners have no phone of their own, so without that
+  // second case they would have no training history at all.
+  const canLog = Boolean(
+    activeAthleteId && (activeAthleteId === profile?.id || isParent(role))
+  );
   const today = planDayToday();
 
   const subtitle = activeAthlete && !isAthlete(role)
@@ -203,7 +207,13 @@ export default function Training() {
                         size={17}
                         color={colors.primary}
                       />
-                      <Text style={styles.logText}>{logged ? 'Log again' : 'Mark it done'}</Text>
+                      <Text style={styles.logText}>
+                        {logged
+                          ? 'Log again'
+                          : isParent(role)
+                            ? `Log this for ${firstName(activeAthlete?.full_name)}`
+                            : 'Mark it done'}
+                      </Text>
                     </Pressable>
                   ) : null}
                 </Card>

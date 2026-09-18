@@ -161,10 +161,12 @@ export type WorkoutLog = {
   duration_seconds: number | null;
   effort: number | null;
   notes: string | null;
+  /** Differs from athlete_id when a parent entered the run for their athlete. */
+  logged_by: string | null;
 };
 
 export const WORKOUT_LOG_COLUMNS =
-  'id, athlete_id, workout_id, logged_on, distance_miles, duration_seconds, effort, notes';
+  'id, athlete_id, workout_id, logged_on, distance_miles, duration_seconds, effort, notes, logged_by';
 
 export const isCoach = (role: AppRole | undefined): boolean =>
   role === 'admin' || role === 'coach';
