@@ -55,11 +55,23 @@ through that function. Be conservative about what the app collects — it needs 
 less about a minor than a registration system does, and the registration system
 already lives elsewhere.
 
-`athlete_profiles` holds the health information a coach needs at practice —
-injuries, medical notes, an emergency contact — and it is a separate table, not
-columns on `profiles`, so that boundary is one policy rather than a per-column
-argument. Photos are pictures of minors: the bucket is private and the app hands
-out short-lived signed URLs, never a public link. Keep both that way.
+`athlete_profiles` holds what a coach needs at practice — current and past
+injuries, and an emergency contact — and it is a separate table, not columns on
+`profiles`, so that boundary is one policy rather than a per-column argument.
+
+**Medical conditions, allergies and medication are deliberately not in the app.**
+The coach gathers those from parents directly. A test asserts there is no column
+to put them in; do not add one back. Injuries stay because they change what a
+coach asks an athlete to run today.
+
+Staff reads of an intake form go through `staff_view_athlete_profile()`, which
+writes an `audit_log` row. Read the table directly and that record is lost.
+
+Photos are the clinic's own pictures of minors: staff post, the bucket is
+private, and the app hands out short-lived signed URLs, never a public link.
+Athlete and parent uploads would make this user-generated content and pull in
+App Store Guideline 1.2 (reporting, blocking, moderation) — do not add them
+without building that first.
 
 ## Conventions
 

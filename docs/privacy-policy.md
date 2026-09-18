@@ -30,8 +30,8 @@ store the relay address Apple gives us and nothing else.
 optionally a phone number.
 
 **An athlete's intake form.** School, grade, personal best times, goals,
-injury history, medical conditions, allergies and medication notes, and an
-emergency contact's name, relationship, and phone number.
+current and past injuries, and an emergency contact's name, relationship, and
+phone number.
 
 **Training activity.** Workouts an athlete marks as done, including distance,
 time, how hard it felt, and any note written to the coach.
@@ -43,6 +43,12 @@ discuss.
 
 ## What the app does not collect
 
+**The app does not hold medical conditions, allergies, or medication.** Coach
+Will gathers those from parents and guardians directly, so the most sensitive
+information about a child never goes into this app at all. Injuries are the only
+health information the app holds, because they change what a coach asks an
+athlete to run.
+
 The app does not collect location, does not access your contacts or microphone,
 does not use advertising identifiers, and contains no advertising or third-party
 analytics. We do not track you across other apps or websites. We do not sell
@@ -52,8 +58,9 @@ personal information, and we never have.
 
 - To show you the schedule, your training, and clinic news.
 - So coaches know who is on the roster and who has been training.
-- **So a coach at practice knows about the inhaler, the allergy, or the injury,
-  and who to call.** This is why the health fields exist.
+- **So a coach knows an athlete is carrying an injury before setting them off on
+  a hard session, and knows who to call.** This is why the injury and emergency
+  contact fields exist.
 
 ## Children's information
 
@@ -62,9 +69,10 @@ Most athletes in the clinic are under 18, and some are under 13.
 - A child's intake form is visible only to that athlete, the parents or
   guardians linked to them, and clinic coaching staff. It is never shown to
   other families, and it does not appear in any list or search.
+- The app deliberately holds no medical conditions, allergies, or medication for
+  any athlete. Those conversations happen between the coach and the parents.
 - **Every time a coach opens an athlete's intake form, we record who looked and
   when.** Parents may ask us for that record.
-- We ask for a parent or guardian to confirm the health information may be held.
 - We collect as little as the clinic can operate on. The app deliberately does
   not ask for a birth date, an address, or anything the registration on the
   website already holds.

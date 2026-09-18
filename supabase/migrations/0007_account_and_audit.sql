@@ -41,9 +41,7 @@ alter table athlete_profiles
   add column guardian_consent_at timestamptz;
 
 comment on column athlete_profiles.guardian_consent_at is
-  'When a guardian confirmed the health information may be held. Recorded, and
-   shown to staff, but not yet enforced as a precondition for saving — that is a
-   product decision the clinic owner has to make.';
+  'When a guardian confirmed the health information may be held.';
 
 -- ---------------------------------------------------------------------------
 -- Staff reads of an intake form go through this, so they can be logged.

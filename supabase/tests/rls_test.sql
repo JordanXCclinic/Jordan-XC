@@ -184,7 +184,7 @@ begin
 end $$;
 
 -- ---------------------------------------------------------------------------
--- Intake forms and health information (0004).
+-- Intake forms and injury information (0004, narrowed by 0008).
 --
 -- athlete 22… and parent 33… are linked. athlete 55… is a real, unrelated
 -- athlete — a better probe than a user with no profile at all, because it is
@@ -196,8 +196,8 @@ select set_config('request.jwt.claim.sub', :athlete, false);
 
 do $$
 begin
-  insert into athlete_profiles (athlete_id, school, grade, medical_notes, emergency_contact_name)
-  values (auth.uid(), 'Mountain Brook', '9th', 'Carries an inhaler', 'Pat Runner');
+  insert into athlete_profiles (athlete_id, school, grade, current_injuries, emergency_contact_name)
+  values (auth.uid(), 'Mountain Brook', '9th', 'Left achilles sore', 'Pat Runner');
   raise notice 'PASS: athlete can fill in their own intake form';
 exception when others then
   raise notice 'FAIL: athlete cannot write own intake form (%)', sqlerrm;
@@ -208,11 +208,11 @@ select set_config('request.jwt.claim.sub', :parent, false);
 do $$
 declare v_notes text;
 begin
-  select medical_notes into v_notes from athlete_profiles
+  select current_injuries into v_notes from athlete_profiles
    where athlete_id = '22222222-2222-2222-2222-222222222222';
-  if v_notes = 'Carries an inhaler'
-  then raise notice 'PASS: parent can read their athlete''s medical notes';
-  else raise notice 'FAIL: parent could not read medical notes (got %)', coalesce(v_notes, 'null');
+  if v_notes = 'Left achilles sore'
+  then raise notice 'PASS: parent can read their athlete''s injury notes';
+  else raise notice 'FAIL: parent could not read injury notes (got %)', coalesce(v_notes, 'null');
   end if;
 end $$;
 
@@ -234,14 +234,14 @@ declare n int;
 begin
   select count(*) into n from athlete_profiles
    where athlete_id = '22222222-2222-2222-2222-222222222222';
-  if n = 0 then raise notice 'PASS: another athlete cannot read medical notes';
+  if n = 0 then raise notice 'PASS: another athlete cannot read injury notes';
   else raise notice 'FAIL: another athlete read % intake rows', n;
   end if;
 end $$;
 
 do $$
 begin
-  insert into athlete_profiles (athlete_id, medical_notes)
+  insert into athlete_profiles (athlete_id, current_injuries)
   values ('22222222-2222-2222-2222-222222222222', 'injected by a stranger');
   raise notice 'FAIL: a stranger wrote to someone else''s intake form';
 exception when others then
@@ -255,8 +255,8 @@ declare n int;
 begin
   select count(*) into n from athlete_profiles
    where athlete_id = '22222222-2222-2222-2222-222222222222';
-  if n = 1 then raise notice 'PASS: coach can read athlete medical notes';
-  else raise notice 'FAIL: coach cannot read medical notes';
+  if n = 1 then raise notice 'PASS: coach can read athlete injury notes';
+  else raise notice 'FAIL: coach cannot read injury notes';
   end if;
 end $$;
 
@@ -296,6 +296,21 @@ begin
   else raise notice 'FAIL: another athlete read % personal bests', n;
   end if;
 end $$;
+
+-- The clinic gathers medical conditions, allergies and medication from parents
+-- directly. There must be nowhere in the schema to put them.
+reset role;
+do $$
+declare n int;
+begin
+  select count(*) into n from information_schema.columns
+   where table_schema = 'public' and table_name = 'athlete_profiles'
+     and column_name in ('medical_notes', 'medical_conditions', 'allergies', 'medications');
+  if n = 0 then raise notice 'PASS: the schema has nowhere to store medical conditions';
+  else raise notice 'FAIL: % medical column(s) came back into athlete_profiles', n;
+  end if;
+end $$;
+set role authenticated;
 
 -- ---------------------------------------------------------------------------
 -- Meeting slots (0005).
@@ -420,7 +435,7 @@ end $$;
 reset role;
 
 -- ---------------------------------------------------------------------------
--- Account deletion, export, and the medical-access trail (0007).
+-- Account deletion, export, and the injury-record access trail (0007).
 --
 -- Apple will not approve an app that creates accounts but cannot delete them,
 -- so these pin the behaviour rather than just the permission.
@@ -446,7 +461,7 @@ begin
    where action = 'read' and record_id = '22222222-2222-2222-2222-222222222222'
      and actor_id = '22222222-2222-2222-2222-222222222222';
   if n_staff = 1 and n_self = 0
-  then raise notice 'PASS: staff reads of a medical record are logged, the athlete''s own are not';
+  then raise notice 'PASS: staff reads of an injury record are logged, the athlete''s own are not';
   else raise notice 'FAIL: audit trail wrong (staff %, self %)', n_staff, n_self;
   end if;
 end $$;

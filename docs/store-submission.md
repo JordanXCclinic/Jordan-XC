@@ -56,8 +56,9 @@ they will flag hidden functionality. Give them a staff login.
 | Photo library permission string | `app.json` → expo-image-picker plugin | Done |
 | No location, microphone, or contacts access | `app.json` → `blockedPermissions` | Done |
 | Export compliance declared (skips the question each upload) | `ITSAppUsesNonExemptEncryption: false` | Done |
-| Medical record access is logged | `staff_view_athlete_profile()` | Done, tested |
-| One family cannot read another's records | RLS + 37 tests | Done, tested |
+| Injury record access is logged | `staff_view_athlete_profile()` | Done, tested |
+| No medical conditions, allergies or medication stored | `0008`, guarded by a test | Done, tested |
+| One family cannot read another's records | RLS + 38 tests | Done, tested |
 
 ---
 
@@ -100,9 +101,14 @@ analytics: No.** (These stay "No" only while the app ships without an analytics
 or crash-reporting SDK. Adding Sentry changes the diagnostics answer — update
 this table and the policy if you add it.)
 
-Declare **health data** honestly. The intake form holds injuries, medical
-conditions, and medication notes. Understating this is worse than declaring it:
-the data is plainly in the app, and a reviewer will find it.
+Declare **health data** honestly, and note that narrowing what the app collects
+does **not** change this answer. The intake form no longer holds medical
+conditions, allergies, or medication — but it does hold current and past
+injuries, and an injury an athlete types in is health information under both
+Apple's and Google's definitions. The answer stays **Yes**.
+
+Understating it is worse than declaring it: the field is plainly in the app, and
+a reviewer will find it.
 
 ---
 
@@ -152,17 +158,14 @@ Apple Guideline 1.2 applies to apps where users post content other users see. It
 requires a way to report objectionable content, a way to block abusive users,
 published contact details, and a commitment to act on reports within 24 hours.
 
-**As the app stands, 1.2 is not triggered:** only coaching staff post photos and
-announcements; there is no chat, no comments, and no public profiles. Training
-notes and meeting topics are written by families but are visible only to staff.
+**1.2 is not triggered, and by decision it will stay that way.** Photos are the
+clinic's own professional pictures, posted by coaching staff only. There is no
+chat, no comments, and no public profiles. Training notes and meeting topics are
+written by families but are visible only to staff.
 
-**If athletes and parents are allowed to post photos** — as the build spec asks
-for — 1.2 does apply, and the app would need a report button, a block list, and
-a moderation commitment before it would be approved. That is a real piece of
-work and a real ongoing obligation for a clinic whose users are children.
-
-This needs a decision before the photo wall opens up. See the note in the
-handover.
+If athlete and parent photo uploads are ever added, 1.2 applies and the app
+would need a report button, a block list, and a commitment to act on reports
+within 24 hours. Do not open the photo wall up without building those first.
 
 ---
 

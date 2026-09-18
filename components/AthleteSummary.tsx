@@ -94,22 +94,23 @@ export function AthleteSummary({ athleteId }: { athleteId: string }) {
         </Card>
       ) : null}
 
-      {profile?.injury_history || profile?.medical_notes ? (
+      {profile?.current_injuries || profile?.injury_history ? (
         <Card accent="danger">
           <View style={styles.privateHead}>
             <Ionicons name="lock-closed" size={15} color={colors.danger} />
-            <Text style={styles.cardTitle}>Health</Text>
+            <Text style={styles.cardTitle}>Injuries</Text>
           </View>
-          {profile.injury_history ? (
+          {/* What hurts now comes first: it is what changes today's session. */}
+          {profile.current_injuries ? (
             <View style={styles.block}>
-              <Text style={styles.blockLabel}>Injuries</Text>
-              <Text style={styles.body}>{profile.injury_history}</Text>
+              <Text style={styles.blockLabel}>Right now</Text>
+              <Text style={styles.bodyStrong}>{profile.current_injuries}</Text>
             </View>
           ) : null}
-          {profile.medical_notes ? (
+          {profile.injury_history ? (
             <View style={styles.block}>
-              <Text style={styles.blockLabel}>Medical</Text>
-              <Text style={styles.body}>{profile.medical_notes}</Text>
+              <Text style={styles.blockLabel}>Previously</Text>
+              <Text style={styles.body}>{profile.injury_history}</Text>
             </View>
           ) : null}
         </Card>
@@ -151,6 +152,7 @@ function Fact({ label, value }: { label: string; value: string }) {
 const styles = StyleSheet.create({
   cardTitle: { ...type.heading, color: colors.text },
   body: { ...type.body, color: colors.textMuted },
+  bodyStrong: { ...type.body, color: colors.text, fontWeight: '600' },
   facts: { gap: spacing.md, marginTop: spacing.md },
   fact: { gap: 2 },
   factLabel: { ...type.caption, color: colors.textFaint },
