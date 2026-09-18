@@ -20,6 +20,7 @@ import { isSupabaseConfigured, supabase } from '../lib/supabase';
 import { PHOTO_COLUMNS, isCoach, type Photo } from '../lib/types';
 import { radius, spacing, type, type Palette } from '../lib/theme';
 import { useTheme, useThemedStyles } from '../lib/appearance';
+import { useReducedMotion } from '../lib/a11y';
 
 const GUTTER = spacing.sm;
 const COLUMNS = 2;
@@ -27,6 +28,7 @@ const COLUMNS = 2;
 export default function Photos() {
 
   const c = useTheme();
+  const calm = useReducedMotion();
 
   const styles = useThemedStyles(makeStyles);
 
@@ -172,7 +174,7 @@ export default function Photos() {
                 source={urls[photo.storage_path] ? { uri: urls[photo.storage_path] } : null}
                 style={styles.image}
                 contentFit="cover"
-                transition={180}
+                transition={calm ? 0 : 180}
                 accessibilityIgnoresInvertColors
               />
             </Pressable>
@@ -183,7 +185,7 @@ export default function Photos() {
       <Modal
         visible={viewing !== null}
         transparent
-        animationType="fade"
+        animationType={calm ? 'none' : 'fade'}
         onRequestClose={() => setViewing(null)}
       >
         <View style={styles.viewer}>
@@ -195,7 +197,7 @@ export default function Photos() {
             }
             style={styles.viewerImage}
             contentFit="contain"
-            transition={160}
+            transition={calm ? 0 : 160}
             accessibilityIgnoresInvertColors
           />
 

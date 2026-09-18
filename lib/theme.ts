@@ -52,11 +52,13 @@ export const lightColors = {
   /** Muted text on navy — readable without shouting. */
   textOnPrimary: '#C7D5EC',
 
-  success: '#1B7F4B',
+  success: '#15703F',
   successTint: '#E6F3EC',
   warning: '#9A6200',
   warningTint: '#FBF0DE',
   danger: brand.red,
+  /** Filled destructive buttons, with white on top. */
+  dangerSurface: brand.red,
   dangerTint: '#FAEAEC',
 
   overlay: 'rgba(16, 19, 25, 0.45)',
@@ -94,6 +96,9 @@ export const darkColors: Palette = {
   warning: '#E3A94F',
   warningTint: '#2B2214',
   danger: '#F2707E',
+  // Not the lightened red: white on that is 2.8:1. The fill stays saturated so
+  // "Delete for good" is still legible.
+  dangerSurface: '#B62A38',
   dangerTint: '#2E1620',
 
   overlay: 'rgba(0, 0, 0, 0.62)',

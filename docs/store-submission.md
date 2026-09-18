@@ -58,7 +58,10 @@ they will flag hidden functionality. Give them a staff login.
 | Export compliance declared (skips the question each upload) | `ITSAppUsesNonExemptEncryption: false` | Done |
 | Intake form access by staff is logged | `staff_view_athlete_profile()` | Done, tested |
 | **No health data stored at all** | `0008` + `0009`, guarded by a test | Done, tested |
-| One family cannot read another's records | RLS + 38 tests | Done, tested |
+| One family cannot read another's records | RLS + 56 tests | Done, tested |
+| One-on-one clients cannot read each other's | `can_see_item()` | Done, tested |
+| Text contrast meets AA in both themes | `npm run check:contrast` | Done, checked |
+| Crash reports stay in the clinic's own database | `app_errors` | Done |
 
 ---
 
@@ -97,9 +100,14 @@ user's identity** and **not used for tracking**.
 | Contacts, location, browsing history, search history, purchases, financial info, usage data, diagnostics, advertising data | **No** | — |
 
 **Used for tracking: No. Used for third-party advertising: No. Used for
-analytics: No.** (These stay "No" only while the app ships without an analytics
-or crash-reporting SDK. Adding Sentry changes the diagnostics answer — update
-this table and the policy if you add it.)
+analytics: No. Diagnostics: No.**
+
+Diagnostics is "No" because crash reports go into the clinic's own `app_errors`
+table rather than to a third party. That was a deliberate choice over Sentry:
+the privacy policy says there is no outside analytics in this app, and keeping
+that true is worth more than native crash coverage. If Sentry is ever added,
+diagnostics becomes "Yes" and the policy needs a line about it — in the same
+commit, not later.
 
 **Health is "No" only because the app genuinely holds none.** There is no field
 anywhere for injuries, medical conditions, allergies, or medication — the coach

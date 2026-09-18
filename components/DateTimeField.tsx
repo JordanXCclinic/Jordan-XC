@@ -7,6 +7,7 @@ import { Button } from './Button';
 import { formatDateTime, parseLocalDateTime, toDateInput, toTimeInput } from '../lib/format';
 import { radius, spacing, type, type Palette } from '../lib/theme';
 import { useTheme, useThemedStyles } from '../lib/appearance';
+import { useReducedMotion } from '../lib/a11y';
 
 type Props = {
   label: string;
@@ -23,6 +24,7 @@ type Props = {
  */
 export function DateTimeField({ label, value, onChange, hint, minimumDate }: Props) {
   const c = useTheme();
+  const calm = useReducedMotion();
   const styles = useThemedStyles(makeStyles);
 
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -77,7 +79,7 @@ export function DateTimeField({ label, value, onChange, hint, minimumDate }: Pro
       </Pressable>
       {hint ? <Text style={styles.hint}>{hint}</Text> : null}
 
-      <Modal visible={sheetOpen} transparent animationType="slide" onRequestClose={() => setSheetOpen(false)}>
+      <Modal visible={sheetOpen} transparent animationType={calm ? 'none' : 'slide'} onRequestClose={() => setSheetOpen(false)}>
         <Pressable style={styles.backdrop} onPress={() => setSheetOpen(false)} />
         <View style={styles.sheet}>
           <Text style={styles.sheetTitle}>{label}</Text>

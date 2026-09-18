@@ -8,6 +8,7 @@ import { supabase } from '../lib/supabase';
 import { radius, spacing, type, type Palette } from '../lib/theme';
 import type { Workout } from '../lib/types';
 import { useTheme, useThemedStyles } from '../lib/appearance';
+import { useReducedMotion } from '../lib/a11y';
 
 const EFFORTS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 
@@ -21,6 +22,7 @@ type Props = {
 /** How an athlete says "done" — distance, time, and how hard it felt. */
 export function WorkoutLogSheet({ workout, athleteId, onClose, onSaved }: Props) {
   const c = useTheme();
+  const calm = useReducedMotion();
   const styles = useThemedStyles(makeStyles);
 
   const [distance, setDistance] = useState('');
@@ -80,7 +82,7 @@ export function WorkoutLogSheet({ workout, athleteId, onClose, onSaved }: Props)
     <Modal
       visible={workout !== null}
       transparent
-      animationType="slide"
+      animationType={calm ? 'none' : 'slide'}
       onRequestClose={onClose}
     >
       <Pressable style={styles.backdrop} onPress={onClose} accessibilityLabel="Close" />

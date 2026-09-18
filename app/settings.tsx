@@ -26,10 +26,12 @@ import { supabase } from '../lib/supabase';
 import { radius, spacing, type, type Palette } from '../lib/theme';
 import { CLINIC_URL } from './sign-in';
 import { useTheme, useThemedStyles } from '../lib/appearance';
+import { useReducedMotion } from '../lib/a11y';
 
 export default function Settings() {
 
   const c = useTheme();
+  const calm = useReducedMotion();
 
   const styles = useThemedStyles(makeStyles);
 
@@ -281,7 +283,7 @@ export default function Settings() {
       <Modal
         visible={confirming}
         transparent
-        animationType="fade"
+        animationType={calm ? 'none' : 'fade'}
         onRequestClose={() => setConfirming(false)}
       >
         <View style={styles.backdrop}>

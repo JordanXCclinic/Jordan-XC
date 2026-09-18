@@ -7,9 +7,11 @@ import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-cont
 import { Ionicons } from '@expo/vector-icons';
 import * as WebBrowser from 'expo-web-browser';
 import { Button } from '../components/Button';
+import { OfflineBanner } from '../components/OfflineBanner';
 import { AppearanceProvider, useAppearance, useTheme } from '../lib/appearance';
 import { AthleteProvider } from '../lib/athlete';
 import { AuthProvider, useAuth } from '../lib/auth';
+import { reportError } from '../lib/errors';
 import { SUPPORT_EMAIL } from '../lib/legal';
 import { lightColors, radius, spacing, stackHeaderFor, type } from '../lib/theme';
 
@@ -28,6 +30,12 @@ void SplashScreen.preventAutoHideAsync();
  */
 export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
   const insets = useSafeAreaInsets();
+
+  // Fire and forget: the person sees this screen whether or not the report
+  // lands, and a failed report must not replace the explanation.
+  useEffect(() => {
+    void reportError(error);
+  }, [error]);
 
   return (
     <View style={[errorStyles.root, { paddingTop: insets.top + spacing.xxl }]}>
@@ -114,6 +122,7 @@ function Shell() {
   return (
     <>
       <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />
+      <OfflineBanner />
       <Gate>
         <Stack
           screenOptions={{

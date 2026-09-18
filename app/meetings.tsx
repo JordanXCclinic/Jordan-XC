@@ -18,10 +18,12 @@ import { MEETING_MODE_LABELS,
 } from '../lib/types';
 import { spacing, type, type Palette } from '../lib/theme';
 import { useTheme, useThemedStyles } from '../lib/appearance';
+import { useReducedMotion } from '../lib/a11y';
 
 export default function Meetings() {
 
   const c = useTheme();
+  const calm = useReducedMotion();
 
   const styles = useThemedStyles(makeStyles);
 
@@ -192,7 +194,7 @@ export default function Meetings() {
       <Modal
         visible={booking !== null}
         transparent
-        animationType="slide"
+        animationType={calm ? 'none' : 'slide'}
         onRequestClose={() => setBooking(null)}
       >
         <Pressable style={styles.backdrop} onPress={() => setBooking(null)} />

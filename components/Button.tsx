@@ -32,7 +32,7 @@ const fills = (c: Palette): Record<Variant, ViewStyle> => ({
   primary: { backgroundColor: c.primarySurface },
   secondary: { backgroundColor: c.surface, borderWidth: 1, borderColor: c.border },
   ghost: { backgroundColor: 'transparent' },
-  danger: { backgroundColor: c.danger },
+  danger: { backgroundColor: c.dangerSurface },
 });
 
 const inks = (c: Palette): Record<Variant, string> => ({
@@ -82,7 +82,12 @@ export const Button = forwardRef<View, Props>(function Button(
       ) : (
         <>
           {icon ? <Ionicons name={icon} size={18} color={ink} style={styles.icon} /> : null}
-          <Text style={[styles.label, size === 'lg' && styles.labelLg, { color: ink }]} numberOfLines={1}>
+          {/* Two lines, not one: at large text sizes a single line truncates
+              the label into something nobody can act on. */}
+          <Text
+            style={[styles.label, size === 'lg' && styles.labelLg, { color: ink }]}
+            numberOfLines={2}
+          >
             {label}
           </Text>
         </>
@@ -94,6 +99,7 @@ export const Button = forwardRef<View, Props>(function Button(
 const makeStyles = (c: Palette) =>
   StyleSheet.create({
   base: {
+    // A minimum, never a fixed height, so the button grows with the text.
     minHeight: 46,
     flexDirection: 'row',
     alignItems: 'center',

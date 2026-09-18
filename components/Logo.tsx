@@ -1,6 +1,7 @@
 import { Image } from 'expo-image';
 import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 import { brand, radius, shadow } from '../lib/theme';
+import { useReducedMotion } from '../lib/a11y';
 
 type Props = {
   size?: number;
@@ -17,12 +18,13 @@ type Props = {
  * and its corners would show through the circle on the sign-in screen.
  */
 export function Logo({ size = 44, ring, label, style }: Props) {
+  const calm = useReducedMotion();
   const image = (
     <Image
       source={require('../assets/logo.png')}
       style={{ width: '100%', height: '100%' }}
       contentFit="contain"
-      transition={220}
+      transition={calm ? 0 : 220}
       // Decorative marks stay out of the screen reader's way; the screens that
       // use one as a heading pass a label instead.
       accessibilityLabel={label}

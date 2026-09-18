@@ -10,12 +10,14 @@ import { isSupabaseConfigured, supabase } from '../../lib/supabase';
 import { POST_COLUMNS, type Post } from '../../lib/types';
 import { radius, spacing, type, type Palette } from '../../lib/theme';
 import { useTheme, useThemedStyles } from '../../lib/appearance';
+import { useReducedMotion } from '../../lib/a11y';
 
 const ALL = 'All';
 
 export default function Learn() {
 
   const c = useTheme();
+  const calm = useReducedMotion();
 
   const styles = useThemedStyles(makeStyles);
 
@@ -99,7 +101,7 @@ export default function Learn() {
                 source={{ uri: post.hero_image_url }}
                 style={styles.hero}
                 contentFit="cover"
-                transition={200}
+                transition={calm ? 0 : 200}
                 accessibilityIgnoresInvertColors
               />
             ) : null}
