@@ -4,8 +4,9 @@
 #
 #   npm run db:bundle
 #
-# Generated, never edited by hand, and never committed — schema changes go in
-# supabase/migrations/ as a new numbered file.
+# Committed so it can be copied straight from GitHub into the SQL editor, but
+# generated: never edit it by hand. Schema changes go in supabase/migrations/
+# as a new numbered file, then re-run this.
 set -euo pipefail
 
 out="supabase/bundled-migrations.sql"
