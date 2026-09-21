@@ -166,8 +166,13 @@ export default function CoachHome() {
             onPress={() => router.push(tool.href as never)}
             style={({ pressed }) => [styles.tool, pressed && styles.pressed]}
           >
-            <View style={styles.toolIcon}>
-              <Ionicons name={tool.icon} size={20} color={c.primary} />
+            <View style={styles.toolTop}>
+              <View style={styles.toolIcon}>
+                <Ionicons name={tool.icon} size={20} color={c.primary} />
+              </View>
+              {/* These tiles are buttons. Without the chevron they read as
+                  status cards, which is exactly how they were being read. */}
+              <Ionicons name="chevron-forward" size={18} color={c.textFaint} />
             </View>
             <Text style={styles.toolTitle}>{tool.title}</Text>
             <Text style={styles.toolSubtitle}>{tool.subtitle}</Text>
@@ -231,6 +236,12 @@ const makeStyles = (c: Palette) =>
     gap: spacing.xs,
     ...shadow.card,
   },
+  toolTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: spacing.xs,
+  },
   toolIcon: {
     width: 38,
     height: 38,
@@ -238,7 +249,6 @@ const makeStyles = (c: Palette) =>
     backgroundColor: c.primaryTint,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: spacing.xs,
   },
   toolTitle: { ...type.bodyStrong, color: c.text },
   toolSubtitle: { ...type.caption, color: c.textMuted, lineHeight: 16 },

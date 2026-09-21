@@ -184,7 +184,17 @@ export function FullScreenLoader() {
 const makeStyles = (c: Palette) =>
   StyleSheet.create({
   root: { flex: 1, backgroundColor: c.background },
-  content: { paddingHorizontal: spacing.lg },
+  content: {
+    paddingHorizontal: spacing.lg,
+    // A phone layout stretched across a desktop browser reads as broken: the
+    // rows run the full width of the window with their text stranded at the
+    // left edge. Capping the column keeps it looking like the app it is.
+    // Web only — on a phone the screen is already narrower than this.
+    ...Platform.select({
+      web: { maxWidth: 720, width: '100%', marginHorizontal: 'auto' as const },
+      default: {},
+    }),
+  },
   header: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md },
   headerText: { flex: 1 },
   title: { ...type.display, color: c.text },
