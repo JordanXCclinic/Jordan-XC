@@ -116,11 +116,14 @@ export type Workout = {
   title: string;
   description: string | null;
   distance_miles: number | null;
+  /** Far end of a planned range. Null when the distance is a single number. */
+  distance_miles_max: number | null;
   intensity: string | null;
 };
 
 export const WORKOUT_COLUMNS =
-  'id, plan_id, week_number, day_of_week, title, description, distance_miles, intensity';
+  'id, plan_id, week_number, day_of_week, title, description, distance_miles, '
+  + 'distance_miles_max, intensity';
 
 export type MeetingSlot = {
   id: string;

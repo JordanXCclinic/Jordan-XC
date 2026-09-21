@@ -103,8 +103,29 @@ export function formatDuration(seconds: number | null): string | null {
 
 export function formatMiles(miles: number | null): string | null {
   if (miles === null) return null;
+  return `${milesNumber(miles)} mi`;
+}
+
+/** The number on its own: "6", "6.2". Shared so a range reads like a single. */
+function milesNumber(miles: number): string {
   const trimmed = Number(miles);
-  return `${trimmed % 1 === 0 ? trimmed.toFixed(0) : trimmed.toFixed(2).replace(/0$/, '')} mi`;
+  return trimmed % 1 === 0 ? trimmed.toFixed(0) : trimmed.toFixed(2).replace(/0$/, '');
+}
+
+/**
+ * A planned distance, which may be a range: "6 mi", or "4–6 mi".
+ *
+ * An en dash rather than a hyphen, because this sits next to times like
+ * "42:30" where a hyphen reads as a minus. A far end without a near end is not
+ * a range, so it is ignored rather than shown as half of one.
+ */
+export function formatMileRange(
+  miles: number | null,
+  milesMax: number | null
+): string | null {
+  if (miles === null) return null;
+  if (milesMax === null || Number(milesMax) <= Number(miles)) return formatMiles(miles);
+  return `${milesNumber(miles)}\u2013${milesNumber(milesMax)} mi`;
 }
 
 export const firstName = (fullName: string | null | undefined): string =>

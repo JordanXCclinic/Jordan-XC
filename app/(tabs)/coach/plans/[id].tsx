@@ -9,7 +9,7 @@ import { ChipSelect, TextField } from '../../../../components/Field';
 import { DateTimeField } from '../../../../components/DateTimeField';
 import { EmptyState, LoadingState, Screen, SectionHeader } from '../../../../components/Screen';
 import { useAuth } from '../../../../lib/auth';
-import { PLAN_DAYS, formatMiles, planDayLabel, toDateInput } from '../../../../lib/format';
+import { PLAN_DAYS, formatMileRange, planDayLabel, toDateInput } from '../../../../lib/format';
 import { isSupabaseConfigured, supabase } from '../../../../lib/supabase';
 import { PROFILE_COLUMNS,
   TRAINING_PLAN_COLUMNS,
@@ -62,6 +62,7 @@ export default function PlanEditor() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [title, setTitle] = useState('');
   const [distance, setDistance] = useState('');
+  const [distanceMax, setDistanceMax] = useState('');
   const [intensity, setIntensity] = useState('');
   const [description, setDescription] = useState('');
   const [startsOn, setStartsOn] = useState(nextMonday);
@@ -172,6 +173,7 @@ export default function PlanEditor() {
     setEditingId(null);
     setTitle('');
     setDistance('');
+    setDistanceMax('');
     setIntensity('');
     setDescription('');
     setError(null);
@@ -184,6 +186,9 @@ export default function PlanEditor() {
     setDay(String(workout.day_of_week));
     setTitle(workout.title);
     setDistance(workout.distance_miles === null ? '' : String(workout.distance_miles));
+    setDistanceMax(
+      workout.distance_miles_max === null ? '' : String(workout.distance_miles_max)
+    );
     setIntensity(workout.intensity ?? '');
     setDescription(workout.description ?? '');
     setError(null);
@@ -202,6 +207,29 @@ export default function PlanEditor() {
       return;
     }
 
+    // The two boxes are one idea, so they are checked together. A range that
+    // does not go upwards is a typo, and a far end with no near end is not a
+    // range at all; both would otherwise be refused by the database with a
+    // message no coach should have to read.
+    const milesMaxRaw = distanceMax.trim() ? Number(distanceMax.trim()) : null;
+    if (milesMaxRaw !== null && (Number.isNaN(milesMaxRaw) || milesMaxRaw <= 0)) {
+      setError('The second distance should be a number of miles, like 8 or 8.5.');
+      return;
+    }
+    if (milesMaxRaw !== null && miles === null) {
+      setError('Fill in the first distance too, or the range has no starting point.');
+      return;
+    }
+    if (milesMaxRaw !== null && miles !== null && milesMaxRaw < miles) {
+      setError('The second distance should be the larger one, like 4 up to 6.');
+      return;
+    }
+    // "4 up to 4" is a single distance written the long way, so it is stored
+    // as one rather than displayed as a range of nothing.
+    const milesMax = milesMaxRaw !== null && miles !== null && milesMaxRaw > miles
+      ? milesMaxRaw
+      : null;
+
     setSaving(true);
     setError(null);
 
@@ -215,6 +243,7 @@ export default function PlanEditor() {
         title: title.trim(),
         description: description.trim() || null,
         distance_miles: miles,
+        distance_miles_max: milesMax,
         intensity: intensity.trim() || null,
       },
       { onConflict: 'plan_id,week_number,day_of_week' }
@@ -312,19 +341,27 @@ export default function PlanEditor() {
                 label="Miles"
                 value={distance}
                 onChangeText={setDistance}
-                placeholder="6"
+                placeholder="4"
                 keyboardType="decimal-pad"
               />
             </View>
             <View style={styles.half}>
               <TextField
-                label="Intensity"
-                value={intensity}
-                onChangeText={setIntensity}
-                placeholder="Hard"
+                label="Up to"
+                value={distanceMax}
+                onChangeText={setDistanceMax}
+                placeholder="6"
+                keyboardType="decimal-pad"
+                hint="Optional. Leave empty for one distance."
               />
             </View>
           </View>
+          <TextField
+            label="Intensity"
+            value={intensity}
+            onChangeText={setIntensity}
+            placeholder="Hard"
+          />
           <TextField
             label="Details"
             value={description}
@@ -371,8 +408,11 @@ export default function PlanEditor() {
             </View>
             <Text style={styles.workoutTitle}>{workout.title}</Text>
             <View style={styles.metaRow}>
-              {formatMiles(workout.distance_miles) ? (
-                <Badge label={formatMiles(workout.distance_miles)!} tone="primary" />
+              {formatMileRange(workout.distance_miles, workout.distance_miles_max) ? (
+                <Badge
+                  label={formatMileRange(workout.distance_miles, workout.distance_miles_max)!}
+                  tone="primary"
+                />
               ) : null}
               {workout.intensity ? <Badge label={workout.intensity} /> : null}
             </View>

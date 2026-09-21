@@ -928,4 +928,51 @@ exception when others then
   raise notice 'PASS: the only coach is told to add another coach first (%)', sqlerrm;
 end $$;
 
+-- Planned mileage ranges. The editor checks these too, but it is not the only
+-- thing that can write a workout, so the table has to refuse a broken range.
+reset role;
+
+do $$
+begin
+  insert into workouts (plan_id, week_number, day_of_week, title,
+                        distance_miles, distance_miles_max)
+  values ('d0000000-0000-0000-0000-000000000021', 2, 1, 'Long run', 4, 6);
+  raise notice 'PASS: a range from 4 up to 6 is accepted';
+exception when others then
+  raise notice 'FAIL: a valid range was refused (%)', sqlerrm;
+end $$;
+
+do $$
+begin
+  insert into workouts (plan_id, week_number, day_of_week, title,
+                        distance_miles, distance_miles_max)
+  values ('d0000000-0000-0000-0000-000000000021', 2, 2, 'Backwards', 6, 4);
+  raise notice 'FAIL: a range that runs downwards was stored';
+exception when others then
+  raise notice 'PASS: a backwards range is refused (%)', sqlerrm;
+end $$;
+
+do $$
+begin
+  insert into workouts (plan_id, week_number, day_of_week, title,
+                        distance_miles, distance_miles_max)
+  values ('d0000000-0000-0000-0000-000000000021', 2, 3, 'Half a range', null, 6);
+  raise notice 'FAIL: a far end with no near end was stored';
+exception when others then
+  raise notice 'PASS: half a range is refused (%)', sqlerrm;
+end $$;
+
+-- A plain single distance, and a workout with no distance at all, both still
+-- write. This is the column every workout written before the change uses.
+do $$
+begin
+  insert into workouts (plan_id, week_number, day_of_week, title, distance_miles)
+  values ('d0000000-0000-0000-0000-000000000021', 2, 4, 'Easy 6', 6);
+  insert into workouts (plan_id, week_number, day_of_week, title)
+  values ('d0000000-0000-0000-0000-000000000021', 2, 5, 'Rest');
+  raise notice 'PASS: single distances and no distance are untouched';
+exception when others then
+  raise notice 'FAIL: an existing shape of workout broke (%)', sqlerrm;
+end $$;
+
 reset role;

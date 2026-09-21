@@ -11,7 +11,7 @@ import { useAthlete } from '../../lib/athlete';
 import { useAuth } from '../../lib/auth';
 import { firstName,
   formatDayHeading,
-  formatMiles,
+  formatMileRange,
   formatRelative,
   formatTime,
 } from '../../lib/format';
@@ -136,8 +136,11 @@ export default function Home() {
           <Text style={styles.kicker}>Today&rsquo;s workout</Text>
           <Text style={styles.workoutTitle}>{workout.title}</Text>
           <View style={styles.metaRow}>
-            {formatMiles(workout.distance_miles) ? (
-              <Badge label={formatMiles(workout.distance_miles)!} tone="primary" />
+            {formatMileRange(workout.distance_miles, workout.distance_miles_max) ? (
+              <Badge
+                label={formatMileRange(workout.distance_miles, workout.distance_miles_max)!}
+                tone="primary"
+              />
             ) : null}
             {workout.intensity ? <Badge label={workout.intensity} /> : null}
           </View>

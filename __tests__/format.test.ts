@@ -1,5 +1,6 @@
 import {
   formatDuration,
+  formatMileRange,
   formatMiles,
   parseDuration,
   parseLocalDateTime,
@@ -76,5 +77,31 @@ describe('labels', () => {
     expect(formatMiles(6)).toBe('6 mi');
     expect(formatMiles(6.2)).toBe('6.2 mi');
     expect(formatMiles(null)).toBeNull();
+  });
+});
+
+describe('formatMileRange', () => {
+  it('reads as a single distance when there is no range', () => {
+    expect(formatMileRange(6, null)).toBe('6 mi');
+    expect(formatMileRange(6.2, null)).toBe('6.2 mi');
+    expect(formatMileRange(null, null)).toBeNull();
+  });
+
+  it('joins the two ends with an en dash, not a hyphen', () => {
+    // A hyphen next to times like 42:30 reads as a minus sign.
+    expect(formatMileRange(4, 6)).toBe('4\u20136 mi');
+    expect(formatMileRange(4.5, 6.25)).toBe('4.5\u20136.25 mi');
+  });
+
+  it('ignores a far end that is not actually further', () => {
+    // Stored rows should never look like this, but a range of nothing is
+    // worse to show than the single distance it really is.
+    expect(formatMileRange(6, 6)).toBe('6 mi');
+    expect(formatMileRange(6, 4)).toBe('6 mi');
+  });
+
+  it('shows nothing when only the far end is set', () => {
+    // Half a range is not a distance, so it is not rendered as one.
+    expect(formatMileRange(null, 6)).toBeNull();
   });
 });

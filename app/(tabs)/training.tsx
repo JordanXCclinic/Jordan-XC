@@ -8,7 +8,7 @@ import { SegmentedControl } from '../../components/SegmentedControl';
 import { WorkoutLogSheet } from '../../components/WorkoutLogSheet';
 import { useAthlete } from '../../lib/athlete';
 import { useAuth } from '../../lib/auth';
-import { firstName, formatMiles, planDayLabel } from '../../lib/format';
+import { firstName, formatMileRange, planDayLabel } from '../../lib/format';
 import { isSupabaseConfigured, supabase } from '../../lib/supabase';
 import { currentWeekNumber, planDayToday } from '../../lib/training';
 import { TRAINING_PLAN_COLUMNS,
@@ -191,8 +191,11 @@ export default function Training() {
                   <Text style={styles.title}>{workout.title}</Text>
 
                   <View style={styles.metaRow}>
-                    {formatMiles(workout.distance_miles) ? (
-                      <Badge label={formatMiles(workout.distance_miles)!} tone="primary" />
+                    {formatMileRange(workout.distance_miles, workout.distance_miles_max) ? (
+                      <Badge
+                        label={formatMileRange(workout.distance_miles, workout.distance_miles_max)!}
+                        tone="primary"
+                      />
                     ) : null}
                     {workout.intensity ? <Badge label={workout.intensity} /> : null}
                   </View>
