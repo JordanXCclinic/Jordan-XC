@@ -1,0 +1,109 @@
+# Publishes the web version of the app, plus the privacy policy and terms, to
+# GitHub Pages at https://jordanxcclinic.github.io/Jordan-XC/
+#
+# The phone apps are built separately with EAS. This is the browser version:
+# somewhere to try the real app, and the public address the App Store and Play
+# Store require for the privacy policy.
+#
+# The Supabase address and key come from repository variables rather than being
+# committed, because this repository is public. Set them once under
+# Settings -> Secrets and variables -> Actions -> Variables.
+
+name: Publish the web app
+
+on:
+  push:
+    branches: [claude/clever-volta-79edno]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Never let two publishes race; the newer one wins.
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Check the Supabase settings are present
+        env:
+          SUPABASE_URL: ${{ vars.EXPO_PUBLIC_SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ vars.EXPO_PUBLIC_SUPABASE_ANON_KEY }}
+        run: |
+          # Written as plain if-blocks on purpose: GitHub runs these steps with
+          # "set -e", and a bare "[ -z "$X" ] && ..." that turns out false is
+          # itself a failing command, which would fail the build precisely when
+          # the settings are correct.
+          missing=0
+          if [ -z "$SUPABASE_URL" ]; then
+            echo "::error::Repository variable EXPO_PUBLIC_SUPABASE_URL is not set."
+            missing=1
+          fi
+          if [ -z "$SUPABASE_ANON_KEY" ]; then
+            echo "::error::Repository variable EXPO_PUBLIC_SUPABASE_ANON_KEY is not set."
+            missing=1
+          fi
+          if [ "$missing" = 1 ]; then
+            echo "::error::Add them under Settings -> Secrets and variables -> Actions -> Variables. Without them the published app cannot reach the database and nobody can sign in."
+            exit 1
+          fi
+
+      - run: npm ci
+
+      - run: npm run typecheck
+
+      - name: Build the web app
+        env:
+          # Pages serves this repository from /<repo name>, so every asset and
+          # route link has to carry that prefix. Reading the name from the event
+          # keeps this correct if the repository is ever renamed.
+          EXPO_WEB_BASE_URL: /${{ github.event.repository.name }}
+          EXPO_PUBLIC_SUPABASE_URL: ${{ vars.EXPO_PUBLIC_SUPABASE_URL }}
+          EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ vars.EXPO_PUBLIC_SUPABASE_ANON_KEY }}
+        run: npm run web:build
+
+      - name: Confirm the build points at the real database
+        env:
+          SUPABASE_URL: ${{ vars.EXPO_PUBLIC_SUPABASE_URL }}
+        run: |
+          host=$(printf '%s' "$SUPABASE_URL" | sed -E 's#^https?://##; s#/.*##')
+          if ! grep -rqF "$host" dist/_expo/static/js/web/; then
+            echo "::error::The built app does not contain the Supabase address. Sign-in would fail."
+            exit 1
+          fi
+          echo "Supabase address is baked into the bundle."
+
+      - name: Add the single-page-app fallback
+        run: |
+          # The app routes in the browser, so a refresh on /schedule asks Pages
+          # for a file that does not exist. Pages serves 404.html in that case,
+          # and a copy of index.html there hands the route back to the app.
+          cp dist/index.html dist/404.html
+          # Pages would otherwise hide the _expo folder as a Jekyll internal.
+          touch dist/.nojekyll
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
