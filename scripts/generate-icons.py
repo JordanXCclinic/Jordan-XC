@@ -87,6 +87,15 @@ android(silhouette(src)).save('assets/android-icon-monochrome.png')
 # transparency and lets the browser's tab colour show through.
 fitted(src, 48, 0.98).save('assets/favicon.png')
 
+# Home screen icons for the web build. iOS rounds and masks these itself and,
+# like the app icon, will not take an alpha channel — a transparent one comes
+# out with a black square behind it — so they are flattened onto white too.
+# 180 is what iOS asks for; Android reads the 192 and 512 from the manifest.
+for size in (180, 192, 512):
+    flatten(fitted(src, size, 0.90), WHITE).convert('RGB').save(
+        f'assets/web-icon-{size}.png'
+    )
+
 for name in (
     'icon.png',
     'logo.png',
@@ -95,6 +104,9 @@ for name in (
     'android-icon-background.png',
     'android-icon-monochrome.png',
     'favicon.png',
+    'web-icon-180.png',
+    'web-icon-192.png',
+    'web-icon-512.png',
 ):
     image = Image.open(f'assets/{name}')
     print(f'  assets/{name:32} {str(image.size):12} {image.mode}')
