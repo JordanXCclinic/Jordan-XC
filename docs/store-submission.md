@@ -67,18 +67,32 @@ they will flag hidden functionality. Give them a staff login.
 
 ## 3. What only you can do
 
-- [ ] **Apple Developer Program** — $99/year, enrol as the business.
-- [ ] **Google Play Console** — $25 one-time.
-- [ ] **Publish the two documents** in `docs/` at public URLs, then update
-      `lib/legal.ts` and paste the same URLs into both store listings.
+- [x] **Supabase project** — created, migrations run, Google enabled, head coach
+      seeded. Apple is still off; it needs the developer account below.
+- [x] **Publish the two documents** — the Pages workflow renders `docs/` into
+      `privacy.html` and `terms.html` beside the web build, and `lib/legal.ts`
+      points at them. Paste the same two URLs into both store listings.
+- [ ] **Apple Developer Program** — $99/year. Enrolling as the business needs a
+      D-U-N-S number for the clinic and takes considerably longer than enrolling
+      as an individual; either satisfies the stores.
+- [ ] **Google Play Console** — $25 one-time. Independent of Apple, so the
+      Android side can ship without waiting on any of it.
+- [ ] **Sign in with Apple** — a Services ID and a signing key, then
+      `node scripts/apple-client-secret.js` to produce the secret Supabase asks
+      for. Gated on the developer account. Apple requires this wherever Google
+      sign-in is offered, so it is not optional for the App Store.
+- [ ] **Add `jordanxc://` to the Supabase redirect URLs** before the first phone
+      build. The web build returns to an https address and does not need it; the
+      phone builds return to the app's own scheme and will not sign in without
+      it.
 - [ ] **Fill in `eas.json`** — Apple ID, App Store Connect app ID, Apple Team
       ID, and the Play service-account key. They are placeholders today.
-- [ ] **Supabase project** — create it, run the migrations, enable the Apple and
-      Google auth providers, and add the redirect URL `jordanxc://`.
 - [ ] **Screenshots** — 6.7" and 6.5" iPhone for Apple, phone and 7" tablet for
       Play. Use the Home, Training, and Schedule screens.
-- [ ] **Have the privacy policy and consent language reviewed** by whoever
-      handles the clinic's paperwork, before real families' medical data goes in.
+- [ ] **Have the privacy policy and terms read** by whoever handles the clinic's
+      paperwork. It describes what the software does, which is the hard part,
+      but it is not legal advice. (The app stores no health data at all — see
+      migrations 0008 and 0009 — so this is not about medical records.)
 
 ---
 
