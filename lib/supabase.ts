@@ -1,4 +1,5 @@
 import 'react-native-url-polyfill/auto';
+import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createClient } from '@supabase/supabase-js';
 
@@ -14,6 +15,10 @@ export const supabase = createClient(url ?? 'https://placeholder.supabase.co', a
     storage: AsyncStorage,
     autoRefreshToken: true,
     persistSession: true,
-    detectSessionInUrl: false,
+    // The web signs in by redirecting the page, so the session comes back in
+    // the returned URL and has to be read out of it. The phone apps hand the
+    // result to setSession themselves, and leaving this on there would mean
+    // parsing deep links that are none of its business.
+    detectSessionInUrl: Platform.OS === 'web',
   },
 });
