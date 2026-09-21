@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Ionicons } from '@expo/vector-icons';
-import { Alert, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Badge } from '../../../components/Badge';
+import { confirmDestructive } from '../../../lib/confirm';
 import { Button } from '../../../components/Button';
 import { Card } from '../../../components/Card';
 import { AudiencePicker } from '../../../components/AudiencePicker';
@@ -124,19 +125,10 @@ export default function CoachPosts() {
     await load();
   }
 
-  function confirmDelete(post: Post) {
-    const remove = async () => {
-      await supabase.from('posts').delete().eq('id', post.id);
-      await load();
-    };
-    if (Platform.OS === 'web') {
-      void remove();
-      return;
-    }
-    Alert.alert('Delete this session?', post.title, [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete', style: 'destructive', onPress: () => void remove() },
-    ]);
+  async function confirmDelete(post: Post) {
+    if (!(await confirmDestructive('Delete this session?', post.title))) return;
+    await supabase.from('posts').delete().eq('id', post.id);
+    await load();
   }
 
   return (
@@ -260,7 +252,7 @@ export default function CoachPosts() {
 
                 <Pressable
                   accessibilityRole="button"
-                  onPress={() => confirmDelete(post)}
+                  onPress={() => void confirmDelete(post)}
                   style={({ pressed }) => [styles.rowAction, pressed && styles.pressed]}
                 >
                   <Ionicons name="trash-outline" size={16} color={c.danger} />

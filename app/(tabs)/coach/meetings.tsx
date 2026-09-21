@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Ionicons } from '@expo/vector-icons';
-import { Alert, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Badge } from '../../../components/Badge';
+import { confirmDestructive } from '../../../lib/confirm';
 import { Button } from '../../../components/Button';
 import { Card } from '../../../components/Card';
 import { ChipSelect, TextField } from '../../../components/Field';
@@ -123,27 +124,18 @@ export default function CoachMeetings() {
     await load();
   }
 
-  function confirmDelete(slot: MeetingSlot) {
-    const remove = async () => {
-      await supabase.from('meeting_slots').delete().eq('id', slot.id);
-      await load();
-    };
-
+  async function confirmDelete(slot: MeetingSlot) {
     const booked = Boolean(slot.booked_for);
-    if (Platform.OS === 'web') {
-      void remove();
-      return;
-    }
-    Alert.alert(
+    const ok = await confirmDestructive(
       booked ? 'Delete this booked meeting?' : 'Delete this time?',
       booked
         ? `${names[slot.booked_for!] ?? 'A family'} has this booked. They will not be told automatically.`
-        : formatDayHeading(slot.starts_at),
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Delete', style: 'destructive', onPress: () => void remove() },
-      ]
+        : formatDayHeading(slot.starts_at)
     );
+    if (!ok) return;
+
+    await supabase.from('meeting_slots').delete().eq('id', slot.id);
+    await load();
   }
 
   const booked = slots.filter((slot) => slot.booked_for !== null);
@@ -210,7 +202,7 @@ export default function CoachMeetings() {
 
                 <Pressable
                   accessibilityRole="button"
-                  onPress={() => confirmDelete(slot)}
+                  onPress={() => void confirmDelete(slot)}
                   style={({ pressed }) => [styles.rowAction, pressed && styles.pressed]}
                 >
                   <Ionicons name="trash-outline" size={16} color={c.danger} />
@@ -234,7 +226,7 @@ export default function CoachMeetings() {
                   <Pressable
                     accessibilityRole="button"
                     accessibilityLabel="Delete this time"
-                    onPress={() => confirmDelete(slot)}
+                    onPress={() => void confirmDelete(slot)}
                     hitSlop={8}
                   >
                     <Ionicons name="trash-outline" size={17} color={c.danger} />

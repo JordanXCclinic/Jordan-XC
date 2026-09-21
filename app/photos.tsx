@@ -2,9 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
-import { Alert,
-  Modal,
-  Platform,
+import { Modal,
   Pressable,
   StyleSheet,
   Text,
@@ -12,6 +10,7 @@ import { Alert,
   View,
 } from 'react-native';
 import { Button } from '../components/Button';
+import { confirmDestructive } from '../lib/confirm';
 import { EmptyState, LoadingState, Screen } from '../components/Screen';
 import { useAuth } from '../lib/auth';
 import { formatDate } from '../lib/format';
@@ -107,23 +106,17 @@ export default function Photos() {
     await load();
   }
 
-  function confirmDelete(photo: Photo) {
-    const remove = async () => {
-      const message = await deletePhoto(photo.id, photo.storage_path);
-      if (message) setError(message);
-      setViewing(null);
-      await load();
-    };
+  async function confirmDelete(photo: Photo) {
+    const ok = await confirmDestructive(
+      'Delete this photo?',
+      'It will be removed for everyone.'
+    );
+    if (!ok) return;
 
-    if (Platform.OS === 'web') {
-      void remove();
-      return;
-    }
-
-    Alert.alert('Delete this photo?', 'It will be removed for everyone.', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete', style: 'destructive', onPress: () => void remove() },
-    ]);
+    const message = await deletePhoto(photo.id, photo.storage_path);
+    if (message) setError(message);
+    setViewing(null);
+    await load();
   }
 
   return (
@@ -215,7 +208,7 @@ export default function Photos() {
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel="Delete photo"
-                onPress={() => confirmDelete(viewing)}
+                onPress={() => void confirmDelete(viewing)}
                 hitSlop={10}
               >
                 <Ionicons name="trash-outline" size={22} color={c.textInverse} />

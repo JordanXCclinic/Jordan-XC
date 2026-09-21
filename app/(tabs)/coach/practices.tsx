@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState } from 'react';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { Alert, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Badge } from '../../../components/Badge';
+import { confirmDestructive } from '../../../lib/confirm';
 import { Button } from '../../../components/Button';
 import { Card } from '../../../components/Card';
 import { AudiencePicker } from '../../../components/AudiencePicker';
@@ -130,19 +131,10 @@ export default function CoachPractices() {
     await load();
   }
 
-  function confirmDelete(practice: Practice) {
-    const remove = async () => {
-      await supabase.from('practices').delete().eq('id', practice.id);
-      await load();
-    };
-    if (Platform.OS === 'web') {
-      void remove();
-      return;
-    }
-    Alert.alert('Delete this practice?', practice.location_name, [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete', style: 'destructive', onPress: () => void remove() },
-    ]);
+  async function confirmDelete(practice: Practice) {
+    if (!(await confirmDestructive('Delete this practice?', practice.location_name))) return;
+    await supabase.from('practices').delete().eq('id', practice.id);
+    await load();
   }
 
   return (
@@ -284,7 +276,7 @@ export default function CoachPractices() {
                 icon="trash-outline"
                 label="Delete"
                 tone={c.danger}
-                onPress={() => confirmDelete(practice)}
+                onPress={() => void confirmDelete(practice)}
               />
             </View>
           </Card>

@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Ionicons } from '@expo/vector-icons';
-import { Alert, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Badge } from '../../../components/Badge';
+import { confirmDestructive } from '../../../lib/confirm';
 import { Button } from '../../../components/Button';
 import { Card } from '../../../components/Card';
 import { AudiencePicker } from '../../../components/AudiencePicker';
@@ -120,19 +121,10 @@ export default function CoachAnnouncements() {
     await load();
   }
 
-  function confirmDelete(item: Announcement) {
-    const remove = async () => {
-      await supabase.from('announcements').delete().eq('id', item.id);
-      await load();
-    };
-    if (Platform.OS === 'web') {
-      void remove();
-      return;
-    }
-    Alert.alert('Delete this announcement?', item.title, [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete', style: 'destructive', onPress: () => void remove() },
-    ]);
+  async function confirmDelete(item: Announcement) {
+    if (!(await confirmDestructive('Delete this announcement?', item.title))) return;
+    await supabase.from('announcements').delete().eq('id', item.id);
+    await load();
   }
 
   return (
@@ -250,7 +242,7 @@ export default function CoachAnnouncements() {
 
                 <Pressable
                   accessibilityRole="button"
-                  onPress={() => confirmDelete(item)}
+                  onPress={() => void confirmDelete(item)}
                   style={({ pressed }) => [styles.rowAction, pressed && styles.pressed]}
                 >
                   <Ionicons name="trash-outline" size={16} color={c.danger} />

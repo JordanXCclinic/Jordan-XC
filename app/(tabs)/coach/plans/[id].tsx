@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useLocalSearchParams } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import { Badge } from '../../../../components/Badge';
@@ -9,11 +9,14 @@ import { ChipSelect, TextField } from '../../../../components/Field';
 import { DateTimeField } from '../../../../components/DateTimeField';
 import { EmptyState, LoadingState, Screen, SectionHeader } from '../../../../components/Screen';
 import { useAuth } from '../../../../lib/auth';
+import { confirmDestructive } from '../../../../lib/confirm';
 import { PLAN_DAYS, formatMileRange, planDayLabel, toDateInput } from '../../../../lib/format';
 import { isSupabaseConfigured, supabase } from '../../../../lib/supabase';
-import { PROFILE_COLUMNS,
+import { AUDIENCE_LABELS,
+  PROFILE_COLUMNS,
   TRAINING_PLAN_COLUMNS,
   WORKOUT_COLUMNS,
+  type Audience,
   type Profile,
   type TrainingPlan,
   type Workout,
@@ -22,6 +25,12 @@ import { radius, spacing, type, type Palette } from '../../../../lib/theme';
 import { useTheme, useThemedStyles } from '../../../../lib/appearance';
 
 const DAY_OPTIONS = PLAN_DAYS.map((label, index) => ({ value: String(index + 1), label }));
+
+const AUDIENCES: { value: Audience; label: string }[] = [
+  { value: 'clinic', label: AUDIENCE_LABELS.clinic },
+  { value: 'private', label: AUDIENCE_LABELS.private },
+  { value: 'everyone', label: AUDIENCE_LABELS.everyone },
+];
 
 /** Plans usually start on a Monday, so that is what the date field offers. */
 function nextMonday(): Date {
@@ -61,6 +70,12 @@ export default function PlanEditor() {
   /** Set while correcting an existing session rather than writing a new one. */
   const [editingId, setEditingId] = useState<string | null>(null);
   const [title, setTitle] = useState('');
+  const [editingPlan, setEditingPlan] = useState(false);
+  const [planName, setPlanName] = useState('');
+  const [planDescription, setPlanDescription] = useState('');
+  const [planAudience, setPlanAudience] = useState<Audience>('clinic');
+  const [planSaving, setPlanSaving] = useState(false);
+  const [planError, setPlanError] = useState<string | null>(null);
   const [distance, setDistance] = useState('');
   const [distanceMax, setDistanceMax] = useState('');
   const [intensity, setIntensity] = useState('');
@@ -259,7 +274,79 @@ export default function PlanEditor() {
     await load();
   }
 
+  function startEditingPlan() {
+    if (!plan) return;
+    setPlanName(plan.name);
+    setPlanDescription(plan.description ?? '');
+    setPlanAudience(plan.audience);
+    setPlanError(null);
+    setEditingPlan(true);
+  }
+
+  async function savePlan() {
+    if (!id) return;
+    if (!planName.trim()) {
+      setPlanError('Give the plan a name.');
+      return;
+    }
+
+    setPlanSaving(true);
+    setPlanError(null);
+
+    const { error: updateError } = await supabase
+      .from('training_plans')
+      .update({
+        name: planName.trim(),
+        description: planDescription.trim() || null,
+        audience: planAudience,
+      })
+      .eq('id', id);
+
+    setPlanSaving(false);
+    if (updateError) {
+      setPlanError(updateError.message);
+      return;
+    }
+
+    setEditingPlan(false);
+    await load();
+  }
+
+  async function deletePlan() {
+    if (!id || !plan) return;
+
+    // Spelled out rather than "are you sure": the workouts and every athlete's
+    // assignment go with it, and the count is the part worth knowing before
+    // pressing Delete rather than after.
+    const confirmed = await confirmDestructive(
+      `Delete "${plan.name}"?`,
+      `This also deletes ${workouts.length} ${workouts.length === 1 ? 'workout' : 'workouts'}` +
+        ` and unassigns ${assigned.size} ${assigned.size === 1 ? 'athlete' : 'athletes'}.` +
+        ' It cannot be undone.'
+    );
+    if (!confirmed) return;
+
+    setPlanSaving(true);
+    const { error: deleteError } = await supabase.from('training_plans').delete().eq('id', id);
+    setPlanSaving(false);
+
+    if (deleteError) {
+      setPlanError(deleteError.message);
+      return;
+    }
+    router.back();
+  }
+
   async function removeWorkout(workout: Workout) {
+    // The bin sits beside the edit affordance on a card that is itself
+    // tappable, so it asks first. It deleted on the first press before.
+    const confirmed = await confirmDestructive(
+      `Delete "${workout.title}"?`,
+      `${planDayLabel(workout.day_of_week)} of week ${workout.week_number}.` +
+        ' Any training an athlete already logged against it is kept.'
+    );
+    if (!confirmed) return;
+
     await supabase.from('workouts').delete().eq('id', workout.id);
     await load();
   }
@@ -301,6 +388,70 @@ export default function PlanEditor() {
 
   return (
     <Screen inStack title={plan.name} subtitle={plan.description ?? undefined} avoidKeyboard>
+      {editingPlan ? (
+        <Card accent="primary">
+          <Text style={styles.cardTitle}>Edit this plan</Text>
+          <View style={styles.fields}>
+            <TextField
+              label="Plan name"
+              value={planName}
+              onChangeText={setPlanName}
+              placeholder="Summer base"
+              required
+            />
+            <TextField
+              label="Description"
+              value={planDescription}
+              onChangeText={setPlanDescription}
+              placeholder="Six weeks of aerobic base before the season."
+              multiline
+            />
+            <ChipSelect
+              label="Who it is for"
+              options={AUDIENCES}
+              value={planAudience}
+              onChange={setPlanAudience}
+            />
+          </View>
+
+          {planError ? <Text style={styles.error}>{planError}</Text> : null}
+
+          <View style={styles.planFormActions}>
+            <Button
+              label="Cancel"
+              variant="secondary"
+              onPress={() => setEditingPlan(false)}
+              style={styles.planFormAction}
+            />
+            <Button
+              label="Save plan"
+              loading={planSaving}
+              onPress={savePlan}
+              style={styles.planFormAction}
+            />
+          </View>
+        </Card>
+      ) : (
+        <View style={styles.planActions}>
+          <Pressable
+            accessibilityRole="button"
+            onPress={startEditingPlan}
+            style={({ pressed }) => [styles.planAction, pressed && styles.pressed]}
+          >
+            <Ionicons name="create-outline" size={16} color={c.primary} />
+            <Text style={styles.planActionText}>Edit plan</Text>
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => void deletePlan()}
+            style={({ pressed }) => [styles.planAction, pressed && styles.pressed]}
+          >
+            <Ionicons name="trash-outline" size={16} color={c.danger} />
+            <Text style={[styles.planActionText, styles.planActionDanger]}>Delete plan</Text>
+          </Pressable>
+        </View>
+      )}
+
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.weeks}>
         {weeks.map((number) => {
           const selected = number === week;
@@ -395,7 +546,10 @@ export default function PlanEditor() {
             <View style={styles.head}>
               <Text style={styles.day}>{planDayLabel(workout.day_of_week)}</Text>
               <View style={styles.cardActions}>
-                <Ionicons name="create-outline" size={16} color={c.textFaint} />
+                <View style={styles.editHint}>
+                  <Ionicons name="create-outline" size={15} color={c.primary} />
+                  <Text style={styles.editHintText}>Edit</Text>
+                </View>
                 <Pressable
                   accessibilityRole="button"
                   accessibilityLabel={`Delete ${workout.title}`}
@@ -511,6 +665,15 @@ const makeStyles = (c: Palette) =>
   logName: { ...type.caption, color: c.textMuted, flex: 1 },
   error: { ...type.caption, color: c.danger, marginTop: spacing.md },
   head: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  editHint: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
+  editHintText: { ...type.label, color: c.primary },
+  pressed: { opacity: 0.7 },
+  planActions: { flexDirection: 'row', gap: spacing.xl },
+  planAction: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  planActionText: { ...type.label, color: c.primary },
+  planActionDanger: { color: c.danger },
+  planFormActions: { flexDirection: 'row', gap: spacing.md, marginTop: spacing.lg },
+  planFormAction: { flex: 1 },
   day: { ...type.overline, color: c.textFaint },
   workoutTitle: { ...type.heading, color: c.text, marginTop: spacing.xs },
   metaRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm, flexWrap: 'wrap' },
