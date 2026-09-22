@@ -80,6 +80,14 @@ const makeStyles = (c: Palette) =>
     borderTopColor: c.border,
     ...shadow.card,
   },
-  label: { ...type.caption, fontSize: 11, fontWeight: '600' },
+  label: {
+    ...type.caption,
+    fontSize: 11,
+    fontWeight: '600',
+    // type.caption carries lineHeight 16, which this only shrank the font of.
+    // A 16-tall text box is taller than the room the tab bar gives a label, so
+    // the descenders were sliced off. Set with the font size, not inherited.
+    lineHeight: 14,
+  },
   item: {},
 });

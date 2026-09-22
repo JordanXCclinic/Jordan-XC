@@ -9,6 +9,17 @@
  * top strip that matches the page instead of fighting it.
  *
  * Runs after `expo export`, because that is what writes dist/index.html.
+ *
+ * Deliberately NOT full screen. Claiming apple-mobile-web-app-capable did make
+ * it open without Safari's bars, but the tab bar then sat wrong at the bottom
+ * on a real iPhone — labels sliced off — and four attempts at the safe-area
+ * handling behind it did not fix it. None of that was reproducible in any
+ * desktop browser, so each attempt cost the person a test on their own phone.
+ * With the browser's own bars visible the layout has always been correct, and
+ * the icon and name still make it look like an app on the home screen.
+ *
+ * The phone builds are unaffected by any of this: they are not web pages, and
+ * they get the real safe-area handling from the operating system.
  */
 const fs = require('fs');
 const path = require('path');
@@ -53,7 +64,7 @@ const manifest = {
     'The schedule, training, and clinic news hub for athletes and families of the Jordan Cross Country Clinic.',
   start_url: `${BASE}/`,
   scope: `${BASE}/`,
-  display: 'standalone',
+  display: 'browser',
   orientation: 'portrait',
   background_color: BRAND_NAVY,
   theme_color: BRAND_NAVY,
@@ -73,42 +84,17 @@ fs.writeFileSync(
   JSON.stringify(manifest, null, 2) + '\n'
 );
 
-// black-translucent rather than default, and it has to stay that way while
-// viewport-fit=cover is set. "default" keeps an opaque status bar and starts
-// the web view below it, while viewport-fit=cover tells the page it has the
-// whole screen: the app then lays out for a screen taller than it really has
-// and the tab bar falls off the bottom by the height of the status bar. The
-// two must agree. black-translucent gives the web view the whole screen, which
-// is the one the insets describe.
-//
-// In that mode iOS always draws the status bar text white, so the strip behind
-// it is painted brand navy below — white on white would be invisible in light
-// mode. The strip is env(safe-area-inset-top) tall, which is zero in an
-// ordinary browser tab, so it costs nothing there.
+// The icon and the name, and nothing that changes how the page is laid out.
+// apple-mobile-web-app-capable and the status bar and viewport settings that
+// went with it are deliberately absent; see the note at the top of this file.
 const TAGS = `
     <link rel="apple-touch-icon" href="${href('web-icon-180.png')}" />
     <link rel="manifest" href="${href('manifest.json')}" />
-    <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-title" content="Jordan XC" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="theme-color" content="${LIGHT_BACKGROUND}" media="(prefers-color-scheme: light)" />
     <meta name="theme-color" content="${DARK_BACKGROUND}" media="(prefers-color-scheme: dark)" />
     <meta name="description" content="${manifest.description}" />
     <style>
-      /* Expo's own reset sizes the page with height: 100%. In an installed iOS
-         app with viewport-fit=cover that resolves short of the real screen, so
-         the app ended above the home indicator, the page's white showed through
-         beneath it, and body's overflow: hidden sliced the tab bar labels that
-         fell past that edge. dvh is the viewport actually being displayed.
-         Declared after the reset so it wins, and paired with the fallback for
-         anything that does not know dvh. */
-      html,
-      body,
-      #root {
-        height: 100vh;
-        height: 100dvh;
-      }
       /* Nothing should show through the app now, but if a rounded corner or a
          rubber-band scroll ever reveals the page beneath, it should be the
          app's own colour rather than a white flash. */
@@ -120,40 +106,10 @@ const TAGS = `
           background-color: ${DARK_BACKGROUND};
         }
       }
-      body::before {
-        content: '';
-        position: fixed;
-        top: 0;
-        left: 0;
-        right: 0;
-        height: env(safe-area-inset-top);
-        background: ${BRAND_NAVY};
-        z-index: 9999;
-        pointer-events: none;
-      }
     </style>
   `;
 
 let html = fs.readFileSync(INDEX, 'utf8');
-
-// Without viewport-fit=cover, Safari reports every env(safe-area-inset-*) as
-// zero. react-native-safe-area-context reads exactly those values, so the tab
-// bar was given no room for the home indicator and sat underneath it. It only
-// showed once the app went full screen: before that, Safari's own toolbar
-// happened to fill the gap. Rewritten rather than appended — a second viewport
-// meta is ignored.
-const VIEWPORT = /<meta\s+name="viewport"\s+content="([^"]*)"\s*\/?>/i;
-const viewport = html.match(VIEWPORT);
-if (!viewport) {
-  console.error('index.html has no viewport meta to extend.');
-  process.exit(1);
-}
-if (!viewport[1].includes('viewport-fit')) {
-  html = html.replace(
-    VIEWPORT,
-    `<meta name="viewport" content="${viewport[1]}, viewport-fit=cover" />`
-  );
-}
 
 if (html.includes('apple-touch-icon')) {
   console.log('  index.html already carries the home screen tags');
