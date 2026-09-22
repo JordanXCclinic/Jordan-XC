@@ -73,16 +73,41 @@ fs.writeFileSync(
   JSON.stringify(manifest, null, 2) + '\n'
 );
 
+// black-translucent rather than default, and it has to stay that way while
+// viewport-fit=cover is set. "default" keeps an opaque status bar and starts
+// the web view below it, while viewport-fit=cover tells the page it has the
+// whole screen: the app then lays out for a screen taller than it really has
+// and the tab bar falls off the bottom by the height of the status bar. The
+// two must agree. black-translucent gives the web view the whole screen, which
+// is the one the insets describe.
+//
+// In that mode iOS always draws the status bar text white, so the strip behind
+// it is painted brand navy below — white on white would be invisible in light
+// mode. The strip is env(safe-area-inset-top) tall, which is zero in an
+// ordinary browser tab, so it costs nothing there.
 const TAGS = `
     <link rel="apple-touch-icon" href="${href('web-icon-180.png')}" />
     <link rel="manifest" href="${href('manifest.json')}" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-title" content="Jordan XC" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="theme-color" content="${LIGHT_BACKGROUND}" media="(prefers-color-scheme: light)" />
     <meta name="theme-color" content="${DARK_BACKGROUND}" media="(prefers-color-scheme: dark)" />
     <meta name="description" content="${manifest.description}" />
+    <style>
+      body::before {
+        content: '';
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: env(safe-area-inset-top);
+        background: ${BRAND_NAVY};
+        z-index: 9999;
+        pointer-events: none;
+      }
+    </style>
   `;
 
 let html = fs.readFileSync(INDEX, 'utf8');
