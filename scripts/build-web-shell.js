@@ -87,8 +87,28 @@ const TAGS = `
 
 let html = fs.readFileSync(INDEX, 'utf8');
 
+// Without viewport-fit=cover, Safari reports every env(safe-area-inset-*) as
+// zero. react-native-safe-area-context reads exactly those values, so the tab
+// bar was given no room for the home indicator and sat underneath it. It only
+// showed once the app went full screen: before that, Safari's own toolbar
+// happened to fill the gap. Rewritten rather than appended — a second viewport
+// meta is ignored.
+const VIEWPORT = /<meta\s+name="viewport"\s+content="([^"]*)"\s*\/?>/i;
+const viewport = html.match(VIEWPORT);
+if (!viewport) {
+  console.error('index.html has no viewport meta to extend.');
+  process.exit(1);
+}
+if (!viewport[1].includes('viewport-fit')) {
+  html = html.replace(
+    VIEWPORT,
+    `<meta name="viewport" content="${viewport[1]}, viewport-fit=cover" />`
+  );
+}
+
 if (html.includes('apple-touch-icon')) {
   console.log('  index.html already carries the home screen tags');
+  fs.writeFileSync(INDEX, html);
 } else if (!html.includes('</head>')) {
   console.error('index.html has no </head> to insert before.');
   process.exit(1);
