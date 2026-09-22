@@ -1,7 +1,15 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import { Animated,
+  Easing,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Switch,
+  Text,
+  View,
+} from 'react-native';
 import { Badge } from '../../../../components/Badge';
 import { Button } from '../../../../components/Button';
 import { Card } from '../../../../components/Card';
@@ -61,6 +69,11 @@ export default function PlanEditor() {
   const [workouts, setWorkouts] = useState<Workout[]>([]);
   const [athletes, setAthletes] = useState<Profile[]>([]);
   const [assigned, setAssigned] = useState<Set<string>>(new Set());
+  const [assignError, setAssignError] = useState<string | null>(null);
+  // Swapping the whole screen for a spinner on every refresh rebuilt the page
+  // and lost the scroll position with it. Only the first load has nothing to
+  // show yet.
+  const loadedOnce = useRef(false);
   /** Who has logged each workout, so a coach can see the week at a glance. */
   const [logsByWorkout, setLogsByWorkout] = useState<Record<string, LoggedBy[]>>({});
   const [loading, setLoading] = useState(true);
@@ -89,7 +102,7 @@ export default function PlanEditor() {
       setLoading(false);
       return;
     }
-    setLoading(true);
+    if (!loadedOnce.current) setLoading(true);
 
     const [{ data: planRow }, { data: workoutRows }, { data: athleteRows }, { data: assignRows }] =
       await Promise.all([
@@ -165,6 +178,7 @@ export default function PlanEditor() {
       setLogsByWorkout({});
     }
 
+    loadedOnce.current = true;
     setLoading(false);
   }, [id]);
 
@@ -354,20 +368,42 @@ export default function PlanEditor() {
   async function toggleAssignment(athlete: Profile, next: boolean) {
     if (!id || !profile) return;
 
-    if (next) {
-      await supabase.from('plan_assignments').upsert(
-        {
-          plan_id: id,
-          athlete_id: athlete.id,
-          starts_on: toDateInput(startsOn),
-          assigned_by: profile.id,
-        },
-        { onConflict: 'plan_id,athlete_id' }
-      );
-    } else {
-      await supabase.from('plan_assignments').delete().eq('plan_id', id).eq('athlete_id', athlete.id);
+    // Flip the switch here and leave the rest of the page alone. Reloading
+    // everything meant a coach assigning a squad was thrown back to the top of
+    // the screen after each athlete and had to scroll down again.
+    const flip = (on: boolean) =>
+      setAssigned((current) => {
+        const updated = new Set(current);
+        if (on) updated.add(athlete.id);
+        else updated.delete(athlete.id);
+        return updated;
+      });
+
+    flip(next);
+    setAssignError(null);
+
+    const { error: writeError } = next
+      ? await supabase.from('plan_assignments').upsert(
+          {
+            plan_id: id,
+            athlete_id: athlete.id,
+            starts_on: toDateInput(startsOn),
+            assigned_by: profile.id,
+          },
+          { onConflict: 'plan_id,athlete_id' }
+        )
+      : await supabase
+          .from('plan_assignments')
+          .delete()
+          .eq('plan_id', id)
+          .eq('athlete_id', athlete.id);
+
+    if (writeError) {
+      // Put it back. A switch that stays on is a coach believing an athlete has
+      // training they were never given.
+      flip(!next);
+      setAssignError(`${athlete.full_name} could not be changed — ${writeError.message}`);
     }
-    await load();
   }
 
   if (loading) {
@@ -611,24 +647,98 @@ export default function PlanEditor() {
         <EmptyState icon="people-outline" message="No athletes on the roster yet." />
       ) : (
         athletes.map((athlete) => (
-          <View key={athlete.id} style={styles.assignRow}>
-            <View style={styles.assignText}>
-              <Text style={styles.assignName}>{athlete.full_name}</Text>
-              <Text style={styles.assignMeta}>
-                {athlete.role === 'private_client' ? 'One-on-one' : 'Clinic'}
-              </Text>
-            </View>
-            <Switch
-              value={assigned.has(athlete.id)}
-              onValueChange={(next) => void toggleAssignment(athlete, next)}
-              trackColor={{ true: c.primary, false: c.borderStrong }}
-              thumbColor={c.background}
-              accessibilityLabel={`Assign ${plan.name} to ${athlete.full_name}`}
-            />
-          </View>
+          <AssignRow
+            key={athlete.id}
+            athlete={athlete}
+            planName={plan.name}
+            assigned={assigned.has(athlete.id)}
+            onToggle={(next) => void toggleAssignment(athlete, next)}
+          />
         ))
       )}
+
+      {assignError ? <Text style={styles.error}>{assignError}</Text> : null}
     </Screen>
+  );
+}
+
+/**
+ * One athlete's row. The switch is the control; the row answers it, tinting and
+ * showing a tick so a coach assigning a squad can see what they have done
+ * without reading every switch.
+ *
+ * Colours cannot be driven on the native thread, hence useNativeDriver: false.
+ */
+function AssignRow({
+  athlete,
+  planName,
+  assigned,
+  onToggle,
+}: {
+  athlete: Profile;
+  planName: string;
+  assigned: boolean;
+  onToggle: (next: boolean) => void;
+}) {
+  const c = useTheme();
+  const styles = useThemedStyles(makeStyles);
+  const progress = useRef(new Animated.Value(assigned ? 1 : 0)).current;
+
+  useEffect(() => {
+    Animated.timing(progress, {
+      toValue: assigned ? 1 : 0,
+      duration: 200,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: false,
+    }).start();
+  }, [assigned, progress]);
+
+  return (
+    <Animated.View
+      style={[
+        styles.assignRow,
+        {
+          backgroundColor: progress.interpolate({
+            inputRange: [0, 1],
+            outputRange: [c.background, c.primaryTint],
+          }),
+          borderColor: progress.interpolate({
+            inputRange: [0, 1],
+            outputRange: [c.border, c.primary],
+          }),
+        },
+      ]}
+    >
+      <Animated.View
+        style={[
+          styles.assignCheck,
+          {
+            opacity: progress,
+            // Starts a little small so it arrives rather than appears.
+            transform: [
+              { scale: progress.interpolate({ inputRange: [0, 1], outputRange: [0.6, 1] }) },
+            ],
+          },
+        ]}
+      >
+        <Ionicons name="checkmark" size={14} color={c.textInverse} />
+      </Animated.View>
+
+      <View style={styles.assignText}>
+        <Text style={styles.assignName}>{athlete.full_name}</Text>
+        <Text style={styles.assignMeta}>
+          {athlete.role === 'private_client' ? 'One-on-one' : 'Clinic'}
+        </Text>
+      </View>
+
+      <Switch
+        value={assigned}
+        onValueChange={onToggle}
+        trackColor={{ true: c.primary, false: c.borderStrong }}
+        thumbColor={c.background}
+        accessibilityLabel={`Assign ${planName} to ${athlete.full_name}`}
+      />
+    </Animated.View>
   );
 }
 
@@ -689,6 +799,14 @@ const makeStyles = (c: Palette) =>
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
     gap: spacing.md,
+  },
+  assignCheck: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: c.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   assignText: { flex: 1 },
   assignName: { ...type.bodyStrong, color: c.text },
