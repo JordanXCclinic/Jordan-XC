@@ -96,6 +96,30 @@ const TAGS = `
     <meta name="theme-color" content="${DARK_BACKGROUND}" media="(prefers-color-scheme: dark)" />
     <meta name="description" content="${manifest.description}" />
     <style>
+      /* Expo's own reset sizes the page with height: 100%. In an installed iOS
+         app with viewport-fit=cover that resolves short of the real screen, so
+         the app ended above the home indicator, the page's white showed through
+         beneath it, and body's overflow: hidden sliced the tab bar labels that
+         fell past that edge. dvh is the viewport actually being displayed.
+         Declared after the reset so it wins, and paired with the fallback for
+         anything that does not know dvh. */
+      html,
+      body,
+      #root {
+        height: 100vh;
+        height: 100dvh;
+      }
+      /* Nothing should show through the app now, but if a rounded corner or a
+         rubber-band scroll ever reveals the page beneath, it should be the
+         app's own colour rather than a white flash. */
+      body {
+        background-color: ${LIGHT_BACKGROUND};
+      }
+      @media (prefers-color-scheme: dark) {
+        body {
+          background-color: ${DARK_BACKGROUND};
+        }
+      }
       body::before {
         content: '';
         position: fixed;
