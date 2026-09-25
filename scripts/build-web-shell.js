@@ -40,7 +40,12 @@ const LIGHT_BACKGROUND = '#FFFFFF';
 const DARK_BACKGROUND = '#080D18';
 const BRAND_NAVY = '#003482';
 
-const ICONS = ['web-icon-180.png', 'web-icon-192.png', 'web-icon-512.png'];
+const ICONS = [
+  'web-icon-180.png',
+  'web-icon-192.png',
+  'web-icon-512.png',
+  'web-splash-logo.png',
+];
 
 if (!fs.existsSync(INDEX)) {
   console.error(`No build at ${INDEX}. Run "expo export --platform web" first.`);
@@ -95,6 +100,29 @@ const TAGS = `
     <meta name="theme-color" content="${DARK_BACKGROUND}" media="(prefers-color-scheme: dark)" />
     <meta name="description" content="${manifest.description}" />
     <style>
+      /* The page is blank until the bundle has downloaded and drawn the first
+         screen, which on a phone on clinic wifi is a second or two of white.
+         This paints the clinic's own opening instead, in the markup, so it is
+         there on the first frame with nothing to wait for. It is removed as
+         soon as the app has something on screen. */
+      #boot {
+        position: fixed;
+        inset: 0;
+        z-index: 2147483646;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: ${BRAND_NAVY};
+        transition: opacity 260ms ease-out;
+      }
+      #boot img {
+        width: 128px;
+        height: 128px;
+      }
+      #boot.done {
+        opacity: 0;
+        pointer-events: none;
+      }
       /* Nothing should show through the app now, but if a rounded corner or a
          rubber-band scroll ever reveals the page beneath, it should be the
          app's own colour rather than a white flash. */
@@ -109,6 +137,36 @@ const TAGS = `
     </style>
   `;
 
+// Sits inside <body> rather than <head>, and is taken down by the app itself
+// appearing rather than by a timer: a slow connection should hold the badge for
+// as long as it needs, and a fast one should not sit on it.
+const BOOT = `
+    <div id="boot"><img src="${href('web-splash-logo.png')}" alt="" /></div>
+    <script>
+      (function () {
+        var boot = document.getElementById('boot');
+        var root = document.getElementById('root');
+        if (!boot || !root) return;
+        var done = false;
+        function clear() {
+          if (done) return;
+          done = true;
+          observer.disconnect();
+          boot.className = 'done';
+          setTimeout(function () { boot.remove(); }, 400);
+        }
+        var observer = new MutationObserver(function () {
+          if (root.childElementCount > 0) clear();
+        });
+        observer.observe(root, { childList: true, subtree: true });
+        if (root.childElementCount > 0) clear();
+        // If the bundle fails outright, do not leave the badge up forever with
+        // nothing behind it: the app's own error screen should be reachable.
+        setTimeout(clear, 10000);
+      })();
+    </script>
+  `;
+
 let html = fs.readFileSync(INDEX, 'utf8');
 
 if (html.includes('apple-touch-icon')) {
@@ -119,6 +177,11 @@ if (html.includes('apple-touch-icon')) {
   process.exit(1);
 } else {
   html = html.replace('</head>', `${TAGS}</head>`);
+  if (!html.includes('</body>')) {
+    console.error('index.html has no </body> to insert the opening screen before.');
+    process.exit(1);
+  }
+  html = html.replace('</body>', `${BOOT}</body>`);
   fs.writeFileSync(INDEX, html);
 }
 

@@ -12,6 +12,7 @@ import { ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Logo } from './Logo';
 import { radius, spacing, type, type Palette } from '../lib/theme';
 import { useTheme, useThemedStyles } from '../lib/appearance';
 
@@ -170,13 +171,19 @@ export function LoadingState({ label }: { label?: string }) {
 }
 
 /** Full-bleed centered spinner for route-level gates. */
+/**
+ * The wait between opening the app and knowing who is looking at it. A bare
+ * spinner gave no sign of whose app it was; the badge does, and it is the same
+ * mark the page shows before any of this has loaded, so the two run together.
+ */
 export function FullScreenLoader() {
   const c = useTheme();
   const styles = useThemedStyles(makeStyles);
 
   return (
     <View style={styles.full}>
-      <ActivityIndicator color={c.primary} size="large" />
+      <Logo size={96} label="Jordan Cross Country Clinic" />
+      <ActivityIndicator color={c.primary} size="large" style={styles.fullSpinner} />
     </View>
   );
 }
@@ -229,4 +236,5 @@ const makeStyles = (c: Palette) =>
   loading: { paddingVertical: spacing.xl, alignItems: 'center', gap: spacing.sm },
   loadingLabel: { ...type.caption, color: c.textFaint },
   full: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: c.background },
+  fullSpinner: { marginTop: spacing.xl },
 });

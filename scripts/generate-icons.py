@@ -87,6 +87,10 @@ android(silhouette(src)).save('assets/android-icon-monochrome.png')
 # transparency and lets the browser's tab colour show through.
 fitted(src, 48, 0.98).save('assets/favicon.png')
 
+# The mark the web page paints before any JavaScript has run. It sits on navy,
+# so unlike the home screen icons this one keeps its transparency.
+fitted(src, 256, 0.92).save('assets/web-splash-logo.png')
+
 # Home screen icons for the web build. iOS rounds and masks these itself and,
 # like the app icon, will not take an alpha channel — a transparent one comes
 # out with a black square behind it — so they are flattened onto white too.
@@ -104,6 +108,7 @@ for name in (
     'android-icon-background.png',
     'android-icon-monochrome.png',
     'favicon.png',
+    'web-splash-logo.png',
     'web-icon-180.png',
     'web-icon-192.png',
     'web-icon-512.png',
