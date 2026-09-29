@@ -5,6 +5,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Badge } from '../../components/Badge';
 import { Card } from '../../components/Card';
 import { Logo } from '../../components/Logo';
+import { Stripes } from '../../components/Stripes';
 import { EmptyState, Screen, SectionHeader } from '../../components/Screen';
 import { SegmentedControl } from '../../components/SegmentedControl';
 import { useAthlete } from '../../lib/athlete';
@@ -212,6 +213,25 @@ function NextPractice({ practice }: { practice: Practice | null }) {
       onPress={() => router.push('/(tabs)/schedule')}
       style={({ pressed }) => [styles.hero, pressed && styles.heroPressed]}
     >
+      {/* Speed stripes across the corner, clipped to the card's own curve. The
+          clip is a layer of its own rather than overflow on the card, which on
+          iOS would switch the card's shadow off. */}
+      <View pointerEvents="none" style={styles.heroStripesClip}>
+        <Stripes
+          colors={[c.accent, c.accent]}
+          width={14}
+          height={260}
+          gap={9}
+          style={styles.heroStripes}
+        />
+        <Stripes
+          colors={[c.textOnPrimary, c.textOnPrimary]}
+          width={14}
+          height={260}
+          gap={9}
+          style={[styles.heroStripes, styles.heroStripesFaint]}
+        />
+      </View>
       <View style={styles.heroTop}>
         <Text style={styles.heroKicker}>Next practice</Text>
         <Text style={styles.heroRelative}>{formatRelative(practice.starts_at)}</Text>
@@ -272,9 +292,31 @@ const makeStyles = (c: Palette) =>
     ...shadow.raised,
   },
   heroPressed: { opacity: 0.94 },
+  heroStripesClip: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    borderRadius: radius.xl,
+    overflow: 'hidden',
+  },
+  heroStripes: { position: 'absolute', right: 34, bottom: -70 },
+  heroStripesFaint: { right: -12, opacity: 0.18 },
   heroTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   heroKicker: { ...type.overline, color: c.textOnPrimary },
-  heroRelative: { ...type.caption, color: c.textOnPrimary },
+  heroRelative: {
+    ...type.caption,
+    color: c.textOnPrimary,
+    // A patch of the card's own navy behind the text. The speed stripes cross
+    // this corner, and without it they ran straight through "in 6d"; with it
+    // they pass behind the label instead.
+    backgroundColor: c.primarySurface,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 2,
+    borderRadius: radius.sm,
+    overflow: 'hidden',
+  },
   heroDay: { ...type.title, color: c.textInverse, marginTop: spacing.sm },
   heroTime: { ...type.display, color: c.textInverse, fontSize: 34 },
   heroFoot: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginTop: spacing.sm },

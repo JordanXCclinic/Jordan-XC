@@ -13,6 +13,7 @@ import { ActivityIndicator,
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Logo } from './Logo';
+import { Stripes } from './Stripes';
 import { radius, spacing, type, type Palette } from '../lib/theme';
 import { useTheme, useThemedStyles } from '../lib/appearance';
 
@@ -85,10 +86,26 @@ export function Screen({
     >
       {title ? (
         <View style={styles.header}>
+          {/* Lane lines in the corner of the header: detail for the white space
+              beside a short title, faint enough to sit behind anything. */}
+          <Stripes
+            colors={[c.primaryTint, c.primaryTint, c.accentTint, c.primaryTint]}
+            width={14}
+            height={120}
+            gap={14}
+            style={styles.lanes}
+          />
           <View style={styles.headerText}>
             <Text style={styles.title} accessibilityRole="header">
               {title}
             </Text>
+            <Stripes
+              colors={[c.accent, c.accent, c.primary]}
+              width={10}
+              height={5}
+              gap={3}
+              style={styles.titleStripe}
+            />
             {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
           </View>
           {headerRight}
@@ -125,7 +142,10 @@ export function SectionHeader({
 
   return (
     <View style={styles.section}>
-      <Text style={styles.sectionTitle}>{title}</Text>
+      <View style={styles.sectionLabel}>
+        <Stripes colors={[c.accent]} width={4} height={12} />
+        <Text style={styles.sectionTitle}>{title}</Text>
+      </View>
       {action}
     </View>
   );
@@ -203,6 +223,15 @@ const makeStyles = (c: Palette) =>
     }),
   },
   header: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md },
+  lanes: {
+    position: 'absolute',
+    top: -spacing.xxxl,
+    right: 64,
+    // Drawn first in the header, so the title and the right-hand element paint
+    // over it. A negative zIndex would do the same on a phone but can drop it
+    // behind the page background on the web, where it would vanish entirely.
+  },
+  titleStripe: { marginTop: spacing.sm, marginLeft: 2 },
   headerText: { flex: 1 },
   title: { ...type.display, color: c.text },
   subtitle: { ...type.body, color: c.textMuted, marginTop: spacing.xs },
@@ -213,6 +242,7 @@ const makeStyles = (c: Palette) =>
     justifyContent: 'space-between',
     marginTop: spacing.md,
   },
+  sectionLabel: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   sectionTitle: { ...type.overline, color: c.textFaint, textTransform: 'uppercase' },
   empty: {
     alignItems: 'center',
