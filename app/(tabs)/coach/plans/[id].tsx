@@ -70,6 +70,7 @@ export default function PlanEditor() {
   const [athletes, setAthletes] = useState<Profile[]>([]);
   const [assigned, setAssigned] = useState<Set<string>>(new Set());
   const [assignError, setAssignError] = useState<string | null>(null);
+  const [assigningAll, setAssigningAll] = useState(false);
   // Swapping the whole screen for a spinner on every refresh rebuilt the page
   // and lost the scroll position with it. Only the first load has nothing to
   // show yet.
@@ -365,6 +366,46 @@ export default function PlanEditor() {
     await load();
   }
 
+  // Who "all" means follows the plan's own audience: a clinic plan goes to the
+  // clinic, not to one-on-one clients, and a one-on-one plan the other way.
+  const eligible = athletes.filter((athlete) =>
+    plan?.audience === 'clinic'
+      ? athlete.role === 'athlete'
+      : plan?.audience === 'private'
+        ? athlete.role === 'private_client'
+        : true
+  );
+  const unassigned = eligible.filter((athlete) => !assigned.has(athlete.id));
+
+  async function assignAll() {
+    if (!id || !profile || unassigned.length === 0) return;
+
+    // Only the ones not on it yet. Anyone already assigned keeps the start date
+    // they were given, rather than being moved to whatever the picker says now.
+    const adding = unassigned;
+    const before = assigned;
+    setAssigned(new Set([...assigned, ...adding.map((athlete) => athlete.id)]));
+    setAssignError(null);
+    setAssigningAll(true);
+
+    const { error: writeError } = await supabase.from('plan_assignments').upsert(
+      adding.map((athlete) => ({
+        plan_id: id,
+        athlete_id: athlete.id,
+        starts_on: toDateInput(startsOn),
+        assigned_by: profile.id,
+      })),
+      { onConflict: 'plan_id,athlete_id' }
+    );
+
+    setAssigningAll(false);
+    if (writeError) {
+      // One request, so it either all went in or none of it did.
+      setAssigned(before);
+      setAssignError(`Nobody was assigned — ${writeError.message}`);
+    }
+  }
+
   async function toggleAssignment(athlete: Profile, next: boolean) {
     if (!id || !profile) return;
 
@@ -632,7 +673,26 @@ export default function PlanEditor() {
         ))
       )}
 
-      <SectionHeader title="Assigned to" />
+      <SectionHeader
+        title="Assigned to"
+        action={
+          unassigned.length > 0 ? (
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => void assignAll()}
+              disabled={assigningAll}
+              style={({ pressed }) => [styles.assignAll, (pressed || assigningAll) && styles.pressed]}
+            >
+              <Ionicons name="checkmark-done" size={16} color={c.textInverse} />
+              <Text style={styles.assignAllText}>
+                {assigningAll ? 'Assigning…' : `Assign all (${unassigned.length})`}
+              </Text>
+            </Pressable>
+          ) : eligible.length > 0 ? (
+            <Text style={styles.allAssigned}>Everyone is on it</Text>
+          ) : null
+        }
+      />
 
       <Card>
         <DateTimeField
@@ -800,6 +860,17 @@ const makeStyles = (c: Palette) =>
     paddingVertical: spacing.md,
     gap: spacing.md,
   },
+  assignAll: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    backgroundColor: c.primarySurface,
+    borderRadius: radius.pill,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs + 2,
+  },
+  assignAllText: { ...type.label, color: c.textInverse },
+  allAssigned: { ...type.caption, color: c.success, fontWeight: '700' },
   assignCheck: {
     width: 22,
     height: 22,

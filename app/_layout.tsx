@@ -1,5 +1,5 @@
-import { useCallback, useEffect } from 'react';
-import { Stack, type ErrorBoundaryProps } from 'expo-router';
+import { useCallback, useEffect, useRef } from 'react';
+import { Stack, router, type ErrorBoundaryProps } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -153,6 +153,23 @@ function Shell() {
   // Only navigate once there is somewhere to navigate to: pushing a route
   // before the gate has resolved would land on the sign-in screen.
   useNotificationTaps(Boolean(session) && profileLoaded);
+
+  // Signing out has to leave the screen it happened on. The redirect to
+  // sign-in lives in the tab layout, so a sign-out from Settings — a screen
+  // stacked above the tabs — changed nothing visible until back was pressed
+  // and the tabs were uncovered. Watching the session here covers every way
+  // out: the Settings button, "Use a different account", and a session that
+  // lapses by itself. Only the change from signed in to signed out counts;
+  // the first render with no session is the tab layout's to handle.
+  const hadSession = useRef(Boolean(session));
+  useEffect(() => {
+    const signedOut = hadSession.current && !session;
+    hadSession.current = Boolean(session);
+    if (!signedOut) return;
+    if (router.canDismiss()) router.dismissAll();
+    router.replace('/sign-in');
+  }, [session]);
+
   const header = { ...stackHeaderFor(c), headerShown: true };
 
   return (

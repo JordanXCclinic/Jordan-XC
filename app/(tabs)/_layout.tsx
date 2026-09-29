@@ -1,11 +1,22 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Redirect, Tabs } from 'expo-router';
 import { StyleSheet, type ColorValue } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FullScreenLoader } from '../../components/Screen';
 import { useAuth } from '../../lib/auth';
 import { isAthlete, isCoach } from '../../lib/types';
 import { shadow, type, type Palette } from '../../lib/theme';
 import { useTheme, useThemedStyles } from '../../lib/appearance';
+
+// The navigation library draws the bar 49pt tall, sized for its own 10pt
+// labels. Each tab holds 5pt of padding, a 28pt icon box, a 14pt label and 5pt
+// more padding — 52pt — so the bottom of the label was cut off on every phone,
+// by an amount that varied with each browser's font metrics. That is why it
+// looked fine in a desktop browser and not on an iPhone. 60 leaves room.
+//
+// A numeric height is used as given, with no inset added, so the home
+// indicator's inset has to be added here or the bar sits under it.
+const TAB_BAR_HEIGHT = 60;
 
 const icon =
   (name: keyof typeof Ionicons.glyphMap) =>
@@ -18,6 +29,7 @@ const icon =
 export default function TabsLayout() {
   const c = useTheme();
   const styles = useThemedStyles(makeStyles);
+  const insets = useSafeAreaInsets();
 
   const { session, profile, role, loading, profileLoaded, onboarded } = useAuth();
 
@@ -35,7 +47,7 @@ export default function TabsLayout() {
         headerShown: false,
         tabBarActiveTintColor: c.primary,
         tabBarInactiveTintColor: c.textFaint,
-        tabBarStyle: styles.bar,
+        tabBarStyle: [styles.bar, { height: TAB_BAR_HEIGHT + insets.bottom }],
         tabBarLabelStyle: styles.label,
         tabBarItemStyle: styles.item,
       }}

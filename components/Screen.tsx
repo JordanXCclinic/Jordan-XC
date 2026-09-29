@@ -13,6 +13,7 @@ import { ActivityIndicator,
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Logo } from './Logo';
+import { PullIndicator, useWebPullToRefresh } from './PullToRefresh';
 import { Stripes } from './Stripes';
 import { radius, spacing, type, type Palette } from '../lib/theme';
 import { useTheme, useThemedStyles } from '../lib/appearance';
@@ -60,8 +61,15 @@ export function Screen({
     }
   }, [onRefresh]);
 
-  const scroll = (
+  const web = useWebPullToRefresh({
+    enabled: Boolean(onRefresh),
+    refreshing,
+    onRefresh: () => void handleRefresh(),
+  });
+
+  const list = (
     <ScrollView
+      {...web.scrollProps}
       style={styles.root}
       contentContainerStyle={[
         styles.content,
@@ -73,8 +81,10 @@ export function Screen({
       keyboardShouldPersistTaps="handled"
       keyboardDismissMode="on-drag"
       showsVerticalScrollIndicator={false}
+      // Native only. On the web this control silently does nothing, and the
+      // pull is handled by useWebPullToRefresh above instead.
       refreshControl={
-        onRefresh ? (
+        onRefresh && Platform.OS !== 'web' ? (
           <RefreshControl
             refreshing={refreshing}
             onRefresh={handleRefresh}
@@ -113,6 +123,21 @@ export function Screen({
       ) : null}
       <View style={styles.body}>{children}</View>
     </ScrollView>
+  );
+
+  const scroll = web.active ? (
+    <View style={styles.root}>
+      {list}
+      <PullIndicator
+        pull={web.pull}
+        refreshing={refreshing}
+        top={inStack ? 0 : insets.top}
+        tint={c.primary}
+        background={c.background}
+      />
+    </View>
+  ) : (
+    list
   );
 
   if (!avoidKeyboard) return scroll;

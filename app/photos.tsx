@@ -15,6 +15,7 @@ import { EmptyState, LoadingState, Screen } from '../components/Screen';
 import { useAuth } from '../lib/auth';
 import { formatDate } from '../lib/format';
 import { deletePhoto, signPhotoUrls, uploadPhoto } from '../lib/photos';
+import { prepareWebPhoto, savePhoto } from '../lib/savePhoto';
 import { isSupabaseConfigured, supabase } from '../lib/supabase';
 import { PHOTO_COLUMNS, isCoach, type Photo } from '../lib/types';
 import { radius, spacing, type, type Palette } from '../lib/theme';
@@ -38,6 +39,30 @@ export default function Photos() {
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [viewing, setViewing] = useState<Photo | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [saveNote, setSaveNote] = useState<string | null>(null);
+  const viewingUrl = viewing ? urls[viewing.storage_path] : undefined;
+
+  // Fetched as soon as the photo opens, so the Save tap can hand it straight
+  // to the share sheet. See lib/savePhoto for why that cannot wait.
+  useEffect(() => {
+    setSaveNote(null);
+    if (viewing && viewingUrl) prepareWebPhoto(viewingUrl, viewing.taken_on ?? viewing.created_at);
+  }, [viewing, viewingUrl]);
+
+  async function save() {
+    if (!viewing || !viewingUrl) return;
+    setSaving(true);
+    setSaveNote(null);
+    try {
+      const result = await savePhoto(viewingUrl, viewing.taken_on ?? viewing.created_at);
+      if (result === 'downloaded') setSaveNote('Saved to your downloads.');
+    } catch {
+      setSaveNote('That photo could not be saved. Try again in a moment.');
+    } finally {
+      setSaving(false);
+    }
+  }
   const [error, setError] = useState<string | null>(null);
 
   const staff = isCoach(role);
@@ -202,7 +227,22 @@ export default function Photos() {
                   {formatDate(viewing.taken_on ?? viewing.created_at)}
                 </Text>
               ) : null}
+              {saveNote ? <Text style={styles.captionMeta}>{saveNote}</Text> : null}
             </View>
+
+            {viewingUrl ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Save photo"
+                onPress={() => void save()}
+                disabled={saving}
+                hitSlop={8}
+                style={({ pressed }) => [styles.saveButton, (pressed || saving) && styles.saveButtonPressed]}
+              >
+                <Ionicons name="download-outline" size={18} color={c.textInverse} />
+                <Text style={styles.saveText}>{saving ? 'Saving…' : 'Save'}</Text>
+              </Pressable>
+            ) : null}
 
             {staff && viewing ? (
               <Pressable
@@ -256,6 +296,17 @@ const makeStyles = (c: Palette) =>
     paddingBottom: spacing.xxl,
   },
   viewerText: { flex: 1, gap: 2 },
+  saveButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    backgroundColor: 'rgba(255, 255, 255, 0.16)',
+    borderRadius: radius.pill,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs + 2,
+  },
+  saveButtonPressed: { opacity: 0.6 },
+  saveText: { ...type.label, color: c.textInverse },
   caption: { ...type.bodyStrong, color: c.textInverse },
   captionMeta: { ...type.caption, color: c.borderStrong },
 });
