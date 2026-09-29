@@ -7,6 +7,7 @@ import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-cont
 import { Ionicons } from '@expo/vector-icons';
 import * as WebBrowser from 'expo-web-browser';
 import { OfflineBanner } from '../components/OfflineBanner';
+import { UpdateBanner } from '../components/UpdateBanner';
 import { AppearanceProvider, useAppearance, useTheme } from '../lib/appearance';
 import { AthleteProvider } from '../lib/athlete';
 import { AuthProvider, useAuth } from '../lib/auth';
@@ -175,6 +176,7 @@ function Shell() {
   return (
     <>
       <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />
+      <UpdateBanner />
       <OfflineBanner />
       <Gate>
         <Stack
