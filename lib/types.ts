@@ -157,12 +157,14 @@ export type InviteCode = {
   role: AppRole;
   full_name: string;
   season: string;
+  /** Shared by an athlete's code and their parent's; it is how the two find each other. */
+  family_id: string | null;
   redeemed_at: string | null;
   expires_at: string | null;
 };
 
 export const INVITE_CODE_COLUMNS =
-  'id, code, role, full_name, season, redeemed_at, expires_at';
+  'id, code, role, full_name, season, family_id, redeemed_at, expires_at';
 
 export type WorkoutLog = {
   id: string;

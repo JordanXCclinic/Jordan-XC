@@ -1105,3 +1105,37 @@ end $$;
 
 reset role;
 
+-- Deleting unused codes. Only the head coach; an assistant's delete matches
+-- nothing, because the code table is closed to them entirely.
+insert into invite_codes (code, role, full_name, season, family_id, created_by) values
+  ('DEL00001', 'athlete', 'Never Joined', '2026', 'f0000000-0000-0000-0000-000000000010',
+   'f0000000-0000-0000-0000-000000000001'),
+  ('DEL00002', 'parent', 'Never Joined (parent)', '2026', 'f0000000-0000-0000-0000-000000000010',
+   'f0000000-0000-0000-0000-000000000001');
+
+set role authenticated;
+select set_config('request.jwt.claim.sub', 'f0000000-0000-0000-0000-000000000002', false);
+delete from invite_codes where code in ('DEL00001', 'DEL00002');
+reset role;
+do $$
+begin
+  if (select count(*) from invite_codes where code in ('DEL00001', 'DEL00002')) = 2
+  then raise notice 'PASS: an assistant coach cannot delete codes';
+  else raise notice 'FAIL: an assistant coach deleted a code';
+  end if;
+end $$;
+
+set role authenticated;
+select set_config('request.jwt.claim.sub', 'f0000000-0000-0000-0000-000000000001', false);
+delete from invite_codes where code in ('DEL00001', 'DEL00002') and redeemed_at is null;
+reset role;
+do $$
+begin
+  if not exists (select 1 from invite_codes where code in ('DEL00001', 'DEL00002'))
+  then raise notice 'PASS: the head coach can delete a family''s unused codes';
+  else raise notice 'FAIL: the head coach could not delete unused codes';
+  end if;
+end $$;
+
+reset role;
+

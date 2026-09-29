@@ -7,6 +7,7 @@ import { Button } from '../../../components/Button';
 import { Card } from '../../../components/Card';
 import { SwitchRow, TextField } from '../../../components/Field';
 import { EmptyState, LoadingState, Screen, SectionHeader } from '../../../components/Screen';
+import { confirmDestructive } from '../../../lib/confirm';
 import { isSupabaseConfigured, supabase } from '../../../lib/supabase';
 import { useAuth } from '../../../lib/auth';
 import { INVITE_CODE_COLUMNS, isHeadCoach, type InviteCode } from '../../../lib/types';
@@ -30,6 +31,7 @@ export default function Codes() {
   const [issued, setIssued] = useState<Issued | null>(null);
   const [codes, setCodes] = useState<InviteCode[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [listError, setListError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState<string | null>(null);
@@ -77,6 +79,59 @@ export default function Codes() {
       setCopied(null);
       await load();
     }
+  }
+
+  async function deleteCode(code: InviteCode) {
+    // A parent code finds its athlete through the athlete's code. Delete an
+    // unused athlete code on its own and the parent's could still be redeemed
+    // later into an account connected to nobody — so it goes with it. A parent
+    // code on its own is safe to lose: the athlete can join without one.
+    const partners =
+      code.role === 'parent' || !code.family_id
+        ? []
+        : codes.filter(
+            (other) =>
+              other.id !== code.id &&
+              other.family_id === code.family_id &&
+              other.role === 'parent' &&
+              !other.redeemed_at
+          );
+
+    const confirmed = await confirmDestructive(
+      `Delete the code for ${code.full_name}?`,
+      [
+        `${code.code} stops working. Nobody has used it yet, so nothing else changes.`,
+        partners.length > 0
+          ? `The matching parent code, ${partners.map((p) => p.code).join(' and ')}, is deleted too — without this one it would connect to no one.`
+          : null,
+      ]
+        .filter(Boolean)
+        .join('\n\n')
+    );
+    if (!confirmed) return;
+
+    const ids = [code.id, ...partners.map((p) => p.id)];
+    setListError(null);
+    // The redeemed_at filter is the real guard: a code claimed since this list
+    // loaded is left alone, because a used code is what links a family together.
+    const { data, error: deleteError } = await supabase
+      .from('invite_codes')
+      .delete()
+      .in('id', ids)
+      .is('redeemed_at', null)
+      .select('id');
+
+    if (deleteError) {
+      setListError(deleteError.message);
+      return;
+    }
+    const gone = new Set(((data as { id: string }[] | null) ?? []).map((row) => row.id));
+    if (gone.size < ids.length) {
+      setListError('One of those codes was used a moment ago, so it was kept.');
+    }
+    // Taken out of the list here rather than by reloading, so the list does
+    // not jump back to the top.
+    setCodes((current) => current.filter((existing) => !gone.has(existing.id)));
   }
 
   async function copy(key: string, value: string) {
@@ -180,6 +235,8 @@ export default function Codes() {
 
       <SectionHeader title={`Not yet used (${outstanding.length})`} />
 
+      {listError ? <Text style={styles.error}>{listError}</Text> : null}
+
       {loading ? (
         <LoadingState />
       ) : outstanding.length === 0 ? (
@@ -208,6 +265,15 @@ export default function Codes() {
                   size={16}
                   color={copied === code.id ? c.success : c.textFaint}
                 />
+              </Pressable>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={`Delete the code for ${code.full_name}`}
+                onPress={() => void deleteCode(code)}
+                hitSlop={8}
+                style={({ pressed }) => [styles.delete, pressed && styles.pressed]}
+              >
+                <Ionicons name="trash-outline" size={17} color={c.danger} />
               </Pressable>
             </View>
           </Card>
@@ -245,4 +311,5 @@ const makeStyles = (c: Palette) =>
   name: { ...type.bodyStrong, color: c.text },
   rowCodeWrap: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   rowCode: { ...type.bodyStrong, color: c.primary, letterSpacing: 1.5 },
+  delete: { paddingLeft: spacing.sm },
 });
