@@ -17,7 +17,7 @@ import { firstName,
   formatTime,
 } from '../../lib/format';
 import { isSupabaseConfigured, supabase } from '../../lib/supabase';
-import { currentWeekNumber, planDayToday } from '../../lib/training';
+import { planPositionToday } from '../../lib/training';
 import { ANNOUNCEMENT_COLUMNS,
   PRACTICE_COLUMNS,
   WORKOUT_COLUMNS,
@@ -73,7 +73,7 @@ export default function Home() {
     }
 
     // Today's session comes from wherever the athlete is in their plan, which
-    // depends on when the plan was assigned rather than on the calendar date.
+    // depends on when the plan starts as well as on the calendar date.
     const { data: assignment } = await supabase
       .from('plan_assignments')
       .select('plan_id, starts_on')
@@ -88,12 +88,20 @@ export default function Home() {
       return;
     }
 
+    // A plan that has not started has no workout today, however its first week
+    // happens to line up with this one.
+    const position = planPositionToday(assigned.starts_on);
+    if (!position) {
+      setWorkout(null);
+      return;
+    }
+
     const { data: today } = await supabase
       .from('workouts')
       .select(WORKOUT_COLUMNS)
       .eq('plan_id', assigned.plan_id)
-      .eq('week_number', currentWeekNumber(assigned.starts_on))
-      .eq('day_of_week', planDayToday())
+      .eq('week_number', position.week)
+      .eq('day_of_week', position.day)
       .maybeSingle();
 
     setWorkout((today as Workout | null) ?? null);

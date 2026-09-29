@@ -8,9 +8,16 @@ import { SegmentedControl } from '../../components/SegmentedControl';
 import { WorkoutLogSheet } from '../../components/WorkoutLogSheet';
 import { useAthlete } from '../../lib/athlete';
 import { useAuth } from '../../lib/auth';
-import { firstName, formatMileRange, planDayLabel } from '../../lib/format';
+import { firstName,
+  formatDate,
+  formatMileRange,
+  formatShortDate,
+  isSameDay,
+  parseLocalDateTime,
+  planDayLabel,
+} from '../../lib/format';
 import { isSupabaseConfigured, supabase } from '../../lib/supabase';
-import { currentWeekNumber, planDayToday } from '../../lib/training';
+import { currentWeekNumber, planPositionToday, workoutDate } from '../../lib/training';
 import { TRAINING_PLAN_COLUMNS,
   WORKOUT_COLUMNS,
   isAthlete,
@@ -34,8 +41,8 @@ export default function Training() {
   const [workouts, setWorkouts] = useState<Workout[]>([]);
   const [loggedIds, setLoggedIds] = useState<Set<string>>(new Set());
   const [week, setWeek] = useState(1);
-  /** Where the athlete actually is in the plan, as opposed to the week on screen. */
-  const [thisWeek, setThisWeek] = useState(1);
+  /** The assignment's start date; every workout's calendar date comes from it. */
+  const [startsOn, setStartsOn] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [logging, setLogging] = useState<Workout | null>(null);
 
@@ -86,9 +93,8 @@ export default function Training() {
           .filter((id): id is string => Boolean(id))
       )
     );
-    const active = currentWeekNumber(assigned.starts_on);
-    setThisWeek(active);
-    setWeek(active);
+    setStartsOn(assigned.starts_on);
+    setWeek(currentWeekNumber(assigned.starts_on));
     setLoading(false);
   }, [activeAthleteId]);
 
@@ -112,7 +118,11 @@ export default function Training() {
   const canLog = Boolean(
     activeAthleteId && (activeAthleteId === profile?.id || isParent(role))
   );
-  const today = planDayToday();
+  const now = new Date();
+  const start = startsOn ? parseLocalDateTime(startsOn, '00:00') : null;
+  const notStarted = Boolean(startsOn && !planPositionToday(startsOn, now));
+  const weekStart = startsOn ? workoutDate(startsOn, week, 1) : null;
+  const weekEnd = startsOn ? workoutDate(startsOn, week, 7) : null;
 
   const subtitle = activeAthlete && !isAthlete(role)
     ? `${firstName(activeAthlete.full_name)}’s plan`
@@ -145,6 +155,12 @@ export default function Training() {
           <Card accent="primary">
             <Text style={styles.planName}>{plan.name}</Text>
             {plan.description ? <Text style={styles.planDesc}>{plan.description}</Text> : null}
+            {notStarted && start ? (
+              <View style={styles.startsRow}>
+                <Ionicons name="flag-outline" size={14} color={c.primary} />
+                <Text style={styles.startsText}>Starts {formatDate(start)}</Text>
+              </View>
+            ) : null}
           </Card>
 
           {weeks.length > 1 ? (
@@ -172,20 +188,52 @@ export default function Training() {
             </ScrollView>
           ) : null}
 
+          {weekStart && weekEnd ? (
+            <Text style={styles.weekRange}>
+              Week {week} · {formatShortDate(weekStart)} – {formatShortDate(weekEnd)}
+            </Text>
+          ) : null}
+
           {shown.length === 0 ? (
             <EmptyState icon="bed-outline" message="Nothing written for this week yet." />
           ) : (
             shown.map((workout) => {
-              const isToday = workout.day_of_week === today && week === thisWeek;
+              // "Today" is a date, not a weekday: a plan starting next June has
+              // a Monday in week one, but that is not this Monday.
+              const date = startsOn
+                ? workoutDate(startsOn, workout.week_number, workout.day_of_week)
+                : null;
+              const isToday = date ? isSameDay(date, now) : false;
+              const isPast = date ? !isToday && date < now : false;
               const logged = loggedIds.has(workout.id);
               return (
                 <Card key={workout.id} accent={isToday ? 'primary' : undefined}>
                   <View style={styles.head}>
-                    <Text style={[styles.day, isToday && styles.dayToday]}>
-                      {planDayLabel(workout.day_of_week)}
-                      {isToday ? ' · Today' : ''}
-                    </Text>
-                    {logged ? <Badge label="Logged" tone="success" /> : null}
+                    <View style={styles.headLeft}>
+                      <Text style={[styles.day, isToday && styles.dayToday]}>
+                        {planDayLabel(workout.day_of_week)}
+                      </Text>
+                      {logged ? <Badge label="Logged" tone="success" /> : null}
+                    </View>
+                    {date ? (
+                      <View
+                        style={[
+                          styles.dateBubble,
+                          isPast && styles.dateBubblePast,
+                          isToday && styles.dateBubbleToday,
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.dateBubbleText,
+                            isPast && styles.dateBubbleTextPast,
+                            isToday && styles.dateBubbleTextToday,
+                          ]}
+                        >
+                          {isToday ? `Today · ${formatShortDate(date)}` : formatShortDate(date)}
+                        </Text>
+                      </View>
+                    ) : null}
                   </View>
 
                   <Text style={styles.title}>{workout.title}</Text>
@@ -263,8 +311,25 @@ const makeStyles = (c: Palette) =>
   weekText: { ...type.label, color: c.textMuted },
   weekTextSelected: { color: c.textInverse },
   head: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  headLeft: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   day: { ...type.overline, color: c.textFaint },
   dayToday: { color: c.primary },
+  startsRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginTop: spacing.sm },
+  startsText: { ...type.label, color: c.primary },
+  weekRange: { ...type.caption, color: c.textMuted, fontWeight: '600' },
+  // The date sits in the card's corner as a pill: navy tint ahead, grey once
+  // it has passed, solid navy on the day itself.
+  dateBubble: {
+    backgroundColor: c.primaryTint,
+    borderRadius: radius.pill,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 4,
+  },
+  dateBubblePast: { backgroundColor: c.surfaceSunken },
+  dateBubbleToday: { backgroundColor: c.primarySurface },
+  dateBubbleText: { ...type.caption, color: c.primary, fontWeight: '700' },
+  dateBubbleTextPast: { color: c.textMuted },
+  dateBubbleTextToday: { color: c.textInverse },
   title: { ...type.heading, color: c.text, marginTop: spacing.xs },
   metaRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm, flexWrap: 'wrap' },
   body: { ...type.body, color: c.textMuted, marginTop: spacing.sm },

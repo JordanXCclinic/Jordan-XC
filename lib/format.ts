@@ -26,6 +26,12 @@ export function formatDate(value: Date | string): string {
   return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
+/** "Jun 8" — a date inside the season, where the year goes without saying. */
+export function formatShortDate(value: Date | string): string {
+  const date = typeof value === 'string' ? new Date(value) : value;
+  return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+}
+
 export function formatDayHeading(value: Date | string): string {
   const date = typeof value === 'string' ? new Date(value) : value;
   const today = new Date();

@@ -2,12 +2,18 @@ import {
   formatDuration,
   formatMileRange,
   formatMiles,
+  formatShortDate,
   parseDuration,
   parseLocalDateTime,
   planDayLabel,
   roleLabel,
 } from '../lib/format';
-import { currentWeekNumber, planDayToday } from '../lib/training';
+import {
+  currentWeekNumber,
+  planDayToday,
+  planPositionToday,
+  workoutDate,
+} from '../lib/training';
 
 describe('parseDuration', () => {
   it('reads a time the way a runner writes it', () => {
@@ -64,6 +70,37 @@ describe('training plan weeks', () => {
     expect(planDayToday(new Date(2026, 5, 7))).toBe(7);
     expect(planDayLabel(1)).toBe('Mon');
     expect(planDayLabel(7)).toBe('Sun');
+  });
+
+  it('puts each workout on its calendar date', () => {
+    // Starts Monday 7 June 2027: week 1 Monday is that day, week 2 Wednesday
+    // is nine days later.
+    expect(workoutDate('2027-06-07', 1, 1)).toEqual(new Date(2027, 5, 7));
+    expect(workoutDate('2027-06-07', 2, 3)).toEqual(new Date(2027, 5, 16));
+    // Starting midweek, week 1 still runs from that week's Monday.
+    expect(workoutDate('2026-06-03', 1, 1)).toEqual(new Date(2026, 5, 1));
+  });
+
+  it('has no "today" before the plan starts', () => {
+    // The bug this replaced: a June plan showed a week-one workout as today's
+    // every day of the autumn before it.
+    expect(planPositionToday('2027-06-07', new Date(2026, 8, 29))).toBeNull();
+    expect(planPositionToday('2027-06-07', new Date(2027, 5, 7))).toEqual({ week: 1, day: 1 });
+    expect(planPositionToday('2027-06-07', new Date(2027, 5, 16))).toEqual({ week: 2, day: 3 });
+  });
+
+  it('keeps counting weeks correctly across a clock change', () => {
+    // The week of 8 March 2027 is an hour short where clocks spring forward.
+    // Dividing elapsed time by exactly seven days called the next Monday the
+    // week before. Only visible in a zone with the change, but never wrong.
+    expect(currentWeekNumber('2027-03-08', new Date(2027, 2, 15))).toBe(2);
+    expect(currentWeekNumber('2027-03-08', new Date(2027, 2, 14))).toBe(1);
+  });
+});
+
+describe('formatShortDate', () => {
+  it('reads as a month and day', () => {
+    expect(formatShortDate(new Date(2027, 5, 7))).toMatch(/Jun\s*7|7\s*Jun/);
   });
 });
 
