@@ -94,6 +94,11 @@ companies.
 We keep an athlete's information for as long as they are part of the clinic.
 Records for athletes who have been inactive for 24 months are deleted.
 
+If the head coach removes an athlete from the clinic, their information is
+deleted then, not kept until the 24 months are up. A parent account linked to
+no other athlete in the clinic is deleted with it. Rejoining takes a new clinic
+code.
+
 ## Your choices
 
 **See everything we hold.** Settings → Export my data hands you a complete copy.

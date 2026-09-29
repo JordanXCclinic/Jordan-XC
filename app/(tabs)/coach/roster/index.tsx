@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { router } from 'expo-router';
+import { useCallback, useMemo, useRef, useState } from 'react';
+import { router, useFocusEffect } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Avatar } from '../../../../components/Avatar';
 import { Badge } from '../../../../components/Badge';
@@ -19,25 +19,34 @@ export default function Roster() {
   const [athletes, setAthletes] = useState<Profile[]>([]);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
+  // The spinner is for the first load only. This list reloads every time it
+  // comes back into view, and blanking it each time would throw away the
+  // scroll position.
+  const loadedOnce = useRef(false);
 
   const load = useCallback(async () => {
     if (!isSupabaseConfigured) {
       setLoading(false);
       return;
     }
-    setLoading(true);
+    if (!loadedOnce.current) setLoading(true);
     const { data } = await supabase
       .from('profiles')
       .select(PROFILE_COLUMNS)
       .in('role', ['athlete', 'private_client'])
       .order('full_name');
     setAthletes((data as Profile[] | null) ?? []);
+    loadedOnce.current = true;
     setLoading(false);
   }, []);
 
-  useEffect(() => {
-    void load();
-  }, [load]);
+  // On focus rather than on mount: coming back from an athlete who was just
+  // removed must not still show them in the list.
+  useFocusEffect(
+    useCallback(() => {
+      void load();
+    }, [load])
+  );
 
   const shown = useMemo(() => {
     const needle = search.trim().toLowerCase();

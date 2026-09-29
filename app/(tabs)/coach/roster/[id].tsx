@@ -5,12 +5,17 @@ import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 import { AthleteSummary } from '../../../../components/AthleteSummary';
 import { Avatar } from '../../../../components/Avatar';
 import { Badge } from '../../../../components/Badge';
+import { Button } from '../../../../components/Button';
 import { Card } from '../../../../components/Card';
 import { EmptyState, LoadingState, Screen, SectionHeader } from '../../../../components/Screen';
+import { useAuth } from '../../../../lib/auth';
+import { confirmDestructive } from '../../../../lib/confirm';
 import { formatDate, formatDuration, formatMiles, roleLabel } from '../../../../lib/format';
 import { isSupabaseConfigured, supabase } from '../../../../lib/supabase';
 import { PROFILE_COLUMNS,
   WORKOUT_LOG_COLUMNS,
+  isHeadCoach,
+  type AppRole,
   type Profile,
   type WorkoutLog,
 } from '../../../../lib/types';
@@ -31,6 +36,9 @@ export default function AthleteDetail() {
   /** Names for logs a parent entered, so the coach knows whose account it is. */
   const [loggedByNames, setLoggedByNames] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
+  const { role } = useAuth();
+  const [removing, setRemoving] = useState(false);
+  const [removeError, setRemoveError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!isSupabaseConfigured || !id) {
@@ -114,6 +122,49 @@ export default function AthleteDetail() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  async function removeFromClinic() {
+    if (!athlete) return;
+    setRemoveError(null);
+
+    // Asked of the database rather than worked out here, so the names in the
+    // confirmation are exactly the people the removal will take.
+    const { data: preview, error: previewError } = await supabase.rpc('remove_from_clinic', {
+      p_athlete: athlete.id,
+      p_dry_run: true,
+    });
+    if (previewError) {
+      setRemoveError(previewError.message);
+      return;
+    }
+
+    const people = (preview as { person_name: string; person_role: AppRole }[] | null) ?? [];
+    const parents = people.filter((person) => person.person_role === 'parent').map((p) => p.person_name);
+
+    const confirmed = await confirmDestructive(
+      `Remove ${athlete.full_name}?`,
+      [
+        `${athlete.full_name} loses access to the app, and their intake form, training logs and bookings are deleted.`,
+        parents.length > 0
+          ? `${parents.join(' and ')} ${parents.length === 1 ? 'is' : 'are'} removed too, with no other athlete in the clinic.`
+          : null,
+        'This cannot be undone. Coming back would take a new code.',
+      ]
+        .filter(Boolean)
+        .join('\n\n'),
+      'Remove'
+    );
+    if (!confirmed) return;
+
+    setRemoving(true);
+    const { error } = await supabase.rpc('remove_from_clinic', { p_athlete: athlete.id });
+    setRemoving(false);
+    if (error) {
+      setRemoveError(error.message);
+      return;
+    }
+    router.back();
+  }
 
   if (loading) {
     return (
@@ -233,6 +284,27 @@ export default function AthleteDetail() {
           </Card>
         ))
       )}
+
+      {/* Head coach only, matching who can issue codes. The database refuses
+          anyone else as well; hiding the button is only so an assistant is
+          not offered something that would fail. */}
+      {isHeadCoach(role) ? (
+        <View style={styles.remove}>
+          <Button
+            label="Remove from clinic"
+            variant="danger"
+            icon="person-remove-outline"
+            loading={removing}
+            onPress={() => void removeFromClinic()}
+            full
+          />
+          <Text style={styles.removeNote}>
+            For an athlete who has left, or a test account. You will see exactly who is removed before
+            anything happens.
+          </Text>
+          {removeError ? <Text style={styles.removeError}>{removeError}</Text> : null}
+        </View>
+      ) : null}
     </Screen>
   );
 }
@@ -254,4 +326,7 @@ const makeStyles = (c: Palette) =>
   logStats: { ...type.body, color: c.primary, marginTop: spacing.xs },
   logNotes: { ...type.body, color: c.textMuted, marginTop: spacing.xs },
   logBy: { ...type.caption, color: c.textFaint, marginTop: spacing.sm, fontStyle: 'italic' },
+  remove: { marginTop: spacing.xxl, gap: spacing.sm },
+  removeNote: { ...type.caption, color: c.textMuted, textAlign: 'center' },
+  removeError: { ...type.caption, color: c.danger, textAlign: 'center' },
 });

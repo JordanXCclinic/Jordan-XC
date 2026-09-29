@@ -976,3 +976,132 @@ exception when others then
 end $$;
 
 reset role;
+
+-- Removing someone from the clinic. Self-contained: by this point the original
+-- head coach has deleted their own account, so this block brings its own.
+reset role;
+insert into auth.users (id) values
+  ('f0000000-0000-0000-0000-000000000001'), ('f0000000-0000-0000-0000-000000000002'),
+  ('f0000000-0000-0000-0000-000000000003'), ('f0000000-0000-0000-0000-000000000004'),
+  ('f0000000-0000-0000-0000-000000000005'), ('f0000000-0000-0000-0000-000000000006'),
+  ('f0000000-0000-0000-0000-000000000007'), ('f0000000-0000-0000-0000-000000000008');
+insert into profiles (id, full_name, role) values
+  ('f0000000-0000-0000-0000-000000000001', 'Head Coach',     'admin'),
+  ('f0000000-0000-0000-0000-000000000002', 'Assistant',      'coach'),
+  ('f0000000-0000-0000-0000-000000000003', 'Leaving Athlete','athlete'),
+  ('f0000000-0000-0000-0000-000000000004', 'Only Parent',    'parent'),
+  ('f0000000-0000-0000-0000-000000000005', 'Coach Guardian', 'coach'),
+  ('f0000000-0000-0000-0000-000000000006', 'Sibling One',    'athlete'),
+  ('f0000000-0000-0000-0000-000000000007', 'Sibling Two',    'athlete'),
+  ('f0000000-0000-0000-0000-000000000008', 'Shared Parent',  'parent');
+insert into guardian_links (athlete_id, guardian_id) values
+  ('f0000000-0000-0000-0000-000000000003', 'f0000000-0000-0000-0000-000000000004'),
+  ('f0000000-0000-0000-0000-000000000003', 'f0000000-0000-0000-0000-000000000005'),
+  ('f0000000-0000-0000-0000-000000000006', 'f0000000-0000-0000-0000-000000000008'),
+  ('f0000000-0000-0000-0000-000000000007', 'f0000000-0000-0000-0000-000000000008');
+insert into invite_codes (code, role, full_name, season, family_id, created_by, redeemed_by, redeemed_at) values
+  ('RMA00001', 'athlete', 'Leaving Athlete', '2026', 'f0000000-0000-0000-0000-000000000009',
+   'f0000000-0000-0000-0000-000000000001', 'f0000000-0000-0000-0000-000000000003', now()),
+  ('RMP00001', 'parent', 'Leaving Athlete (parent)', '2026', 'f0000000-0000-0000-0000-000000000009',
+   'f0000000-0000-0000-0000-000000000001', null, null);
+insert into workout_logs (athlete_id, logged_on)
+values ('f0000000-0000-0000-0000-000000000003', current_date);
+
+set role authenticated;
+
+select set_config('request.jwt.claim.sub', 'f0000000-0000-0000-0000-000000000002', false);
+do $$
+begin
+  perform remove_from_clinic('f0000000-0000-0000-0000-000000000003');
+  raise notice 'FAIL: an assistant coach removed an athlete';
+exception when others then
+  raise notice 'PASS: an assistant coach cannot remove anyone (%)', sqlerrm;
+end $$;
+
+select set_config('request.jwt.claim.sub', 'f0000000-0000-0000-0000-000000000006', false);
+do $$
+begin
+  perform remove_from_clinic('f0000000-0000-0000-0000-000000000003');
+  raise notice 'FAIL: an athlete removed another athlete';
+exception when others then
+  raise notice 'PASS: an athlete cannot remove anyone (%)', sqlerrm;
+end $$;
+
+select set_config('request.jwt.claim.sub', 'f0000000-0000-0000-0000-000000000001', false);
+do $$
+declare n int; names text;
+begin
+  select count(*), string_agg(person_name, ', ')
+    into n, names
+    from remove_from_clinic('f0000000-0000-0000-0000-000000000003', true);
+  if n = 2 and names = 'Leaving Athlete, Only Parent'
+     and (select count(*) from profiles where id::text like 'f0000000-%') = 8
+  then raise notice 'PASS: a dry run names the athlete and their only parent, and removes nobody';
+  else raise notice 'FAIL: dry run wrong (% rows: %)', n, names;
+  end if;
+end $$;
+
+do $$
+begin
+  perform remove_from_clinic('f0000000-0000-0000-0000-000000000002');
+  raise notice 'FAIL: a coach was removed through the roster';
+exception when others then
+  raise notice 'PASS: staff cannot be removed through the roster (%)', sqlerrm;
+end $$;
+
+do $$
+begin
+  perform remove_from_clinic('f0000000-0000-0000-0000-000000000008');
+  raise notice 'FAIL: a parent was removed directly through the roster';
+exception when others then
+  raise notice 'PASS: only athletes are removed directly (%)', sqlerrm;
+end $$;
+
+select count(*) from remove_from_clinic('f0000000-0000-0000-0000-000000000003');
+
+reset role;
+do $$
+begin
+  if not exists (select 1 from auth.users where id = 'f0000000-0000-0000-0000-000000000003')
+     and not exists (select 1 from profiles where id = 'f0000000-0000-0000-0000-000000000004')
+     and not exists (select 1 from workout_logs where athlete_id = 'f0000000-0000-0000-0000-000000000003')
+  then raise notice 'PASS: the athlete, their training, and their only parent are gone';
+  else raise notice 'FAIL: something of the removed family is left behind';
+  end if;
+
+  if exists (select 1 from profiles where id = 'f0000000-0000-0000-0000-000000000005' and role = 'coach')
+  then raise notice 'PASS: a coach who was also the guardian was not removed';
+  else raise notice 'FAIL: removing an athlete took a coach with them';
+  end if;
+
+  if not exists (select 1 from invite_codes where code = 'RMP00001')
+  then raise notice 'PASS: the family''s unused parent code was cancelled';
+  else raise notice 'FAIL: an unused code for a removed family can still be redeemed';
+  end if;
+
+  if (select count(*) from audit_log
+       where action = 'remove_from_clinic'
+         and actor_id = 'f0000000-0000-0000-0000-000000000001') = 2
+  then raise notice 'PASS: each removal is on the audit log against the head coach';
+  else raise notice 'FAIL: removal not audited';
+  end if;
+end $$;
+
+set role authenticated;
+select set_config('request.jwt.claim.sub', 'f0000000-0000-0000-0000-000000000001', false);
+select count(*) from remove_from_clinic('f0000000-0000-0000-0000-000000000006');
+
+reset role;
+do $$
+begin
+  if exists (select 1 from profiles where id = 'f0000000-0000-0000-0000-000000000008')
+     and exists (select 1 from guardian_links
+                  where guardian_id = 'f0000000-0000-0000-0000-000000000008'
+                    and athlete_id = 'f0000000-0000-0000-0000-000000000007')
+  then raise notice 'PASS: a parent with another athlete in the clinic keeps their access';
+  else raise notice 'FAIL: a shared parent was removed with one of their athletes';
+  end if;
+end $$;
+
+reset role;
+
