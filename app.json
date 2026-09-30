@@ -9,8 +9,14 @@
     },
     "updates": {
       "enabled": true,
+      "url": "https://u.expo.dev/672783b6-928b-446a-8d7f-8800cb0b1bd2",
       "checkAutomatically": "ON_LOAD",
       "fallbackToCacheTimeout": 0
+    },
+    "extra": {
+      "eas": {
+        "projectId": "672783b6-928b-446a-8d7f-8800cb0b1bd2"
+      }
     },
     "orientation": "portrait",
     "icon": "./assets/icon.png",

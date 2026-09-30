@@ -40,8 +40,10 @@ jobs:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
         run: |
           # Which account the token belongs to, so a mismatch with the
-          # "owner" in app.json is obvious from the log.
-          npx --yes eas-cli@24 whoami
+          # "owner" in app.json is obvious from the log. First line only:
+          # whoami also prints the account's email, and this repository's
+          # Actions logs are public.
+          npx --yes eas-cli@24 whoami | head -n 1
 
           # app.config.js is dynamic config, and eas init will not write a
           # project ID into that. Set aside for this run only, the ID lands in
