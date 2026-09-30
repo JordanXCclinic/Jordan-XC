@@ -18,6 +18,7 @@ import { firstName,
 } from '../../lib/format';
 import { isSupabaseConfigured, supabase } from '../../lib/supabase';
 import { planPositionToday } from '../../lib/training';
+import { openDirections } from '../../lib/maps';
 import { ANNOUNCEMENT_COLUMNS,
   PRACTICE_COLUMNS,
   WORKOUT_COLUMNS,
@@ -251,6 +252,18 @@ function NextPractice({ practice }: { practice: Practice | null }) {
         <Text style={styles.heroLocation} numberOfLines={1}>
           {practice.location_name}
         </Text>
+        {/* Its own button inside the card: the card opens the schedule, this
+            opens maps, so a family on the way out the door is one tap away. */}
+        <Pressable
+          accessibilityRole="link"
+          accessibilityLabel={`Directions to ${practice.location_name}`}
+          hitSlop={8}
+          onPress={() => void openDirections(practice.location_name, practice.map_address)}
+          style={({ pressed }) => [styles.heroMap, pressed && styles.heroMapPressed]}
+        >
+          <Ionicons name="navigate" size={13} color={c.primarySurface} />
+          <Text style={styles.heroMapText}>Directions</Text>
+        </Pressable>
       </View>
       {practice.status === 'moved' ? (
         <View style={styles.heroFlag}>
@@ -329,6 +342,18 @@ const makeStyles = (c: Palette) =>
   heroTime: { ...type.display, color: c.textInverse, fontSize: 34 },
   heroFoot: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginTop: spacing.sm },
   heroLocation: { ...type.body, color: c.textOnPrimary, flex: 1 },
+  heroMap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: c.textInverse,
+    borderRadius: radius.pill,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 6,
+  },
+  heroMapPressed: { opacity: 0.8 },
+  // On the white pill, so the navy that sits on white in both themes.
+  heroMapText: { ...type.label, color: c.primarySurface },
   heroFlag: {
     alignSelf: 'flex-start',
     marginTop: spacing.sm,

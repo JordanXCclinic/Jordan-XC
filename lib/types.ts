@@ -59,6 +59,8 @@ export type Practice = {
   starts_at: string;
   ends_at: string | null;
   location_name: string;
+  /** Street address or maps link for directions; null searches location_name. */
+  map_address: string | null;
   meeting_point: string | null;
   notes: string | null;
   status: 'scheduled' | 'moved' | 'cancelled';
@@ -68,7 +70,7 @@ export type Practice = {
 };
 
 export const PRACTICE_COLUMNS =
-  'id, starts_at, ends_at, location_name, meeting_point, notes, status, audience, audience_athlete_id';
+  'id, starts_at, ends_at, location_name, map_address, meeting_point, notes, status, audience, audience_athlete_id';
 
 export type Announcement = {
   id: string;

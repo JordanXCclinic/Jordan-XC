@@ -8,10 +8,12 @@ import { Button } from '../../../components/Button';
 import { Card } from '../../../components/Card';
 import { AudiencePicker } from '../../../components/AudiencePicker';
 import { TextField } from '../../../components/Field';
+import { MapLink } from '../../../components/MapLink';
 import { DateTimeField } from '../../../components/DateTimeField';
 import { EmptyState, LoadingState, Screen, SectionHeader } from '../../../components/Screen';
 import { useAuth } from '../../../lib/auth';
 import { formatDayHeading, formatTime } from '../../../lib/format';
+import { asMapLink, looksLikeLink, openDirections } from '../../../lib/maps';
 import { isSupabaseConfigured, supabase } from '../../../lib/supabase';
 import { AUDIENCE_LABELS,
   PRACTICE_COLUMNS,
@@ -43,6 +45,7 @@ export default function CoachPractices() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [startsAt, setStartsAt] = useState(defaultStart);
   const [location, setLocation] = useState('');
+  const [mapAddress, setMapAddress] = useState('');
   const [meetingPoint, setMeetingPoint] = useState('');
   const [notes, setNotes] = useState('');
   const [audience, setAudience] = useState<Audience>('clinic');
@@ -73,6 +76,7 @@ export default function CoachPractices() {
   function resetForm() {
     setEditingId(null);
     setLocation('');
+    setMapAddress('');
     setMeetingPoint('');
     setNotes('');
     setAudience('clinic');
@@ -86,6 +90,7 @@ export default function CoachPractices() {
     setEditingId(practice.id);
     setStartsAt(new Date(practice.starts_at));
     setLocation(practice.location_name);
+    setMapAddress(practice.map_address ?? '');
     setMeetingPoint(practice.meeting_point ?? '');
     setNotes(practice.notes ?? '');
     setAudience(practice.audience);
@@ -93,10 +98,21 @@ export default function CoachPractices() {
     setError(null);
   }
 
+  // A pasted link has to be a maps link: a family taps this expecting
+  // directions, and it must not become a way to send them anywhere else.
+  const mapAddressError =
+    looksLikeLink(mapAddress) && !asMapLink(mapAddress)
+      ? 'Paste a Google Maps or Apple Maps link, or type the street address.'
+      : null;
+
   async function save() {
     if (!profile) return;
     if (!location.trim()) {
       setError('Where is it? A location is needed.');
+      return;
+    }
+    if (mapAddressError) {
+      setError(mapAddressError);
       return;
     }
 
@@ -106,6 +122,7 @@ export default function CoachPractices() {
     const fields = {
       starts_at: startsAt.toISOString(),
       location_name: location.trim(),
+      map_address: mapAddress.trim() || null,
       meeting_point: meetingPoint.trim() || null,
       notes: notes.trim() || null,
       audience,
@@ -158,6 +175,28 @@ export default function CoachPractices() {
             placeholder="Jemison Trail"
             required
           />
+          <View>
+            <TextField
+              label="Map address"
+              value={mapAddress}
+              onChangeText={setMapAddress}
+              placeholder="Street address, or paste a Google Maps link"
+              hint="Families tap the location to open it in Maps. Left blank, Maps searches the location name."
+              error={mapAddressError}
+              autoCapitalize="words"
+              maxLength={500}
+            />
+            {(mapAddress.trim() || location.trim()) && !mapAddressError ? (
+              <Pressable
+                accessibilityRole="link"
+                onPress={() => void openDirections(location, mapAddress)}
+                style={({ pressed }) => [styles.checkMap, pressed && styles.pressed]}
+              >
+                <Ionicons name="map-outline" size={15} color={c.primary} />
+                <Text style={styles.checkMapText}>Check the pin in Maps</Text>
+              </Pressable>
+            ) : null}
+          </View>
           <TextField
             label="Meeting point"
             value={meetingPoint}
@@ -225,7 +264,11 @@ export default function CoachPractices() {
               ) : null}
             </View>
 
-            <Text style={styles.location}>{practice.location_name}</Text>
+            <MapLink
+              place={practice.location_name}
+              address={practice.map_address}
+              muted={practice.status === 'cancelled'}
+            />
             {practice.meeting_point ? (
               <Text style={styles.meta}>Meet at {practice.meeting_point}</Text>
             ) : null}
@@ -327,7 +370,15 @@ const makeStyles = (c: Palette) =>
   headText: { flex: 1 },
   day: { ...type.overline, color: c.textFaint },
   time: { ...type.title, color: c.primary, marginTop: 2 },
-  location: { ...type.bodyStrong, color: c.text, marginTop: spacing.sm },
+  checkMap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    alignSelf: 'flex-start',
+    marginTop: spacing.sm,
+    paddingVertical: spacing.xs,
+  },
+  checkMapText: { ...type.label, color: c.primary },
   meta: { ...type.caption, color: c.textMuted, marginTop: 2 },
   rowActions: {
     flexDirection: 'row',

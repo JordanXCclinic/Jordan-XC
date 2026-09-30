@@ -3,6 +3,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { StyleSheet, Text, View } from 'react-native';
 import { Badge, type Tone } from '../../components/Badge';
 import { Card } from '../../components/Card';
+import { MapLink } from '../../components/MapLink';
 import { EmptyState, LoadingState, Screen } from '../../components/Screen';
 import { SegmentedControl } from '../../components/SegmentedControl';
 import { formatDayHeading, formatTime } from '../../lib/format';
@@ -111,7 +112,11 @@ export default function Schedule() {
                     {status ? <Badge label={status.label} tone={status.tone} /> : null}
                   </View>
 
-                  <Text style={styles.location}>{practice.location_name}</Text>
+                  <MapLink
+                    place={practice.location_name}
+                    address={practice.map_address}
+                    muted={practice.status === 'cancelled'}
+                  />
 
                   {practice.meeting_point ? (
                     <View style={styles.detailRow}>
@@ -143,7 +148,6 @@ const makeStyles = (c: Palette) =>
   head: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.md },
   time: { ...type.heading, color: c.primary },
   struck: { textDecorationLine: 'line-through', color: c.textFaint },
-  location: { ...type.bodyStrong, color: c.text, marginTop: spacing.xs },
   detailRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm, alignItems: 'flex-start' },
   detail: { ...type.body, color: c.textMuted, flex: 1 },
 });

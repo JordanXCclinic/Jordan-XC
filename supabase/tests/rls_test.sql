@@ -1137,5 +1137,32 @@ begin
   end if;
 end $$;
 
-reset role;
+-- Map addresses on practices: staff set them, and a paragraph is refused.
+set role authenticated;
+select set_config('request.jwt.claim.sub', 'f0000000-0000-0000-0000-000000000001', false);
+do $$
+declare v_address text;
+begin
+  insert into practices (starts_at, location_name, map_address, created_by)
+  values (now() + interval '3 days', 'Jemison Trail', '3700 Mountain Brook Pkwy, Mountain Brook, AL',
+          'f0000000-0000-0000-0000-000000000001')
+  returning map_address into v_address;
+  if v_address like '3700%'
+  then raise notice 'PASS: a coach can post a practice with a map address';
+  else raise notice 'FAIL: the map address was not saved';
+  end if;
+exception when others then
+  raise notice 'FAIL: a coach could not post a practice with a map address (%)', sqlerrm;
+end $$;
 
+do $$
+begin
+  insert into practices (starts_at, location_name, map_address, created_by)
+  values (now() + interval '3 days', 'Too long', repeat('x', 501),
+          'f0000000-0000-0000-0000-000000000001');
+  raise notice 'FAIL: a 501-character map address was accepted';
+exception when check_violation then
+  raise notice 'PASS: an overlong map address is refused';
+end $$;
+
+reset role;
