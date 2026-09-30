@@ -2,11 +2,20 @@
   "expo": {
     "name": "Jordan XC Clinic",
     "slug": "jordan-xc-clinic",
+    "owner": "jordanxcclinic1",
     "version": "1.0.0",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "enabled": true,
+      "checkAutomatically": "ON_LOAD",
+      "fallbackToCacheTimeout": 0
+    },
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "scheme": "jordanxc",
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "primaryColor": "#003482",
     "ios": {

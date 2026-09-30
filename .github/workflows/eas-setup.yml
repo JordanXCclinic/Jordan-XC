@@ -1,0 +1,56 @@
+# One-time: creates the app's project in the clinic's Expo account and prints
+# its ID, so the phone builds and over-the-air updates have somewhere to go.
+#
+# Run it from the Actions tab ("Set up the phone app project" -> Run workflow)
+# after adding an EXPO_TOKEN secret. It changes nothing in this repository;
+# the ID it prints is committed to app.json by hand afterwards.
+
+name: Set up the phone app project
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Check the Expo token is set
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          if [ -z "$EXPO_TOKEN" ]; then
+            echo "::error::Add a secret named EXPO_TOKEN under Settings -> Secrets and variables -> Actions -> Secrets. It is created at expo.dev under Account settings -> Access tokens."
+            exit 1
+          fi
+
+      - run: npm ci
+
+      - name: Create or link the Expo project
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          # Which account the token belongs to, so a mismatch with the
+          # "owner" in app.json is obvious from the log.
+          npx --yes eas-cli@24 whoami
+
+          # app.config.js is dynamic config, and eas init will not write a
+          # project ID into that. Set aside for this run only, the ID lands in
+          # app.json where it can be read back; the checkout is thrown away.
+          mv app.config.js app.config.js.set-aside
+          npx --yes eas-cli@24 init --non-interactive --force
+
+          node -e "
+            const id = require('./app.json').expo?.extra?.eas?.projectId;
+            if (!id) { console.error('::error::No project ID was written to app.json.'); process.exit(1); }
+            console.log('EAS_PROJECT_ID=' + id);
+          "
