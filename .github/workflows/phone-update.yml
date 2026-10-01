@@ -1,0 +1,104 @@
+# Sends the latest app code straight to the installed phone apps, the same way
+# the web workflow publishes the website: no new build, no App Store review.
+#
+# expo-updates in the app checks for one each time it is opened, downloads it
+# in the background, and switches to it the next time the app is opened.
+#
+# Only JavaScript travels this way. A change to native code — a new Expo
+# package with native parts, the icon, permissions, an SDK upgrade — needs a
+# version bump in app.json and a new build through the App Store. The bump
+# matters: runtimeVersion follows the app version, so phones on the old build
+# never receive code that expects native parts they do not have.
+#
+# Runs on every push to the app's branch, and from the Actions tab
+# ("Publish update to phones" -> Run workflow).
+
+name: Publish update to phones
+
+on:
+  push:
+    branches: [claude/clever-volta-79edno]
+  workflow_dispatch:
+    inputs:
+      message:
+        description: What changed (shown on expo.dev)
+        required: false
+        default: Update from GitHub
+
+permissions:
+  contents: read
+
+# Updates go out in order; a newer one never cancels an older one mid-upload.
+concurrency:
+  group: phone-update
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Check the settings are present
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          SUPABASE_URL: ${{ vars.EXPO_PUBLIC_SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ vars.EXPO_PUBLIC_SUPABASE_ANON_KEY }}
+        run: |
+          missing=0
+          if [ -z "$EXPO_TOKEN" ]; then
+            echo "::error::Secret EXPO_TOKEN is not set."
+            missing=1
+          fi
+          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_ANON_KEY" ]; then
+            echo "::error::Repository variables EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY must both be set."
+            missing=1
+          fi
+          if [ "$missing" = 1 ]; then
+            exit 1
+          fi
+
+      - run: npm ci
+
+      - run: npm run typecheck
+
+      # Bundled here rather than by eas update, so the next step can prove the
+      # bundle points at the real database before anything reaches a phone.
+      # The first iPhone build went out without these values and could not
+      # sign anyone in; this is the check that would have caught it.
+      - name: Bundle the app
+        env:
+          EXPO_PUBLIC_SUPABASE_URL: ${{ vars.EXPO_PUBLIC_SUPABASE_URL }}
+          EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ vars.EXPO_PUBLIC_SUPABASE_ANON_KEY }}
+        run: npx expo export --platform ios
+
+      - name: Confirm the bundle points at the real database
+        env:
+          SUPABASE_URL: ${{ vars.EXPO_PUBLIC_SUPABASE_URL }}
+        run: |
+          host="${SUPABASE_URL#https://}"
+          if ! grep -rqa "$host" dist/_expo/static/js/ios; then
+            echo "::error::The bundle does not contain $host. Phones would not be able to sign in, so nothing was published."
+            exit 1
+          fi
+          echo "Bundle points at $host."
+
+      - name: Publish to the installed apps
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          MESSAGE: ${{ inputs.message || github.event.head_commit.message }}
+        run: |
+          # First line of a commit message only: the rest is detail for git.
+          summary="$(printf '%s' "$MESSAGE" | head -n 1)"
+          npx --yes eas-cli@24 update \
+            --channel production \
+            --platform ios \
+            --environment production \
+            --skip-bundler \
+            --message "$summary" \
+            --non-interactive
