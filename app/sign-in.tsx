@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Redirect } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import { Ionicons } from '@expo/vector-icons';
 import { ActivityIndicator,
@@ -10,6 +11,7 @@ import { ActivityIndicator,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Logo } from '../components/Logo';
+import { useAuth } from '../lib/auth';
 import { isSupabaseConfigured } from '../lib/supabase';
 import { APPLE_SIGN_IN_AVAILABLE, signInWithProvider, type OAuthProvider } from '../lib/oauth';
 import { brand, radius, shadow, spacing, type, type Palette } from '../lib/theme';
@@ -45,6 +47,13 @@ export default function SignIn() {
   const insets = useSafeAreaInsets();
   const [busy, setBusy] = useState<OAuthProvider | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const { session } = useAuth();
+
+  // Signed in: on to the app. The tab layout decides from there whether this
+  // person still needs a clinic code or the intake form. The web never sat on
+  // this screen with a session, because its sign-in reloads the page; the
+  // phone apps sign in without leaving it, and stayed here until reopened.
+  if (session) return <Redirect href="/" />;
 
   async function onPress(provider: OAuthProvider) {
     setBusy(provider);
