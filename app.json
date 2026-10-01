@@ -27,6 +27,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.jordanxcclinic.app",
+      "usesAppleSignIn": true,
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "UISupportedInterfaceOrientations": [
@@ -58,6 +59,7 @@
     },
     "plugins": [
       "expo-router",
+      "expo-apple-authentication",
       [
         "expo-splash-screen",
         {

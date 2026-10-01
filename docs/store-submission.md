@@ -68,25 +68,32 @@ they will flag hidden functionality. Give them a staff login.
 ## 3. What only you can do
 
 - [x] **Supabase project** — created, migrations run, Google enabled, head coach
-      seeded. Apple is still off; it needs the developer account below.
+      seeded.
 - [x] **Publish the two documents** — the Pages workflow renders `docs/` into
       `privacy.html` and `terms.html` beside the web build, and `lib/legal.ts`
       points at them. Paste the same two URLs into both store listings.
-- [ ] **Apple Developer Program** — $99/year. Enrolling as the business needs a
-      D-U-N-S number for the clinic and takes considerably longer than enrolling
-      as an individual; either satisfies the stores.
+- [x] **Apple Developer Program** — enrolled as an individual.
 - [ ] **Google Play Console** — $25 one-time. Independent of Apple, so the
       Android side can ship without waiting on any of it.
-- [ ] **Sign in with Apple** — a Services ID and a signing key, then
-      `node scripts/apple-client-secret.js` to produce the secret Supabase asks
-      for. Gated on the developer account. Apple requires this wherever Google
-      sign-in is offered, so it is not optional for the App Store.
+- [ ] **Sign in with Apple** — iPhone only, through the system sheet
+      (`expo-apple-authentication`), so Supabase needs nothing but the bundle ID
+      `com.jordanxcclinic.app` under Apple → Client IDs; no secret key. Apple
+      requires it wherever Google sign-in is offered on iOS. The web and
+      Android builds offer Google alone. Offering Apple there too would need a
+      Services ID and `scripts/apple-client-secret.js`, renewed every six months.
 - [ ] **Add `jordanxc://` to the Supabase redirect URLs** before the first phone
       build. The web build returns to an https address and does not need it; the
       phone builds return to the app's own scheme and will not sign in without
       it.
-- [ ] **Fill in `eas.json`** — Apple ID, App Store Connect app ID, Apple Team
-      ID, and the Play service-account key. They are placeholders today.
+- [ ] **First iPhone build, from a computer, once** — `npx eas-cli build
+      --platform ios --profile production --auto-submit`, signed in to Apple
+      when asked. That creates the signing certificate, the provisioning
+      profile, the push key, the App Store Connect app, and the API key EAS
+      submits with, and stores them with Expo. It has to be interactive: EAS
+      will not create a distribution certificate in `--non-interactive` mode.
+      Builds after it can run unattended from GitHub with only `EXPO_TOKEN`.
+- [ ] **Fill in `eas.json`** — the App Store Connect app ID once the first
+      submission has created the app, and the Play service-account key.
 - [ ] **Screenshots** — 6.7" and 6.5" iPhone for Apple, phone and 7" tablet for
       Play. Use the Home, Training, and Schedule screens.
 - [ ] **Have the privacy policy and terms read** by whoever handles the clinic's

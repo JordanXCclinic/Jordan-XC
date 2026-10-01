@@ -2,7 +2,6 @@ import { useState } from 'react';
 import * as WebBrowser from 'expo-web-browser';
 import { Ionicons } from '@expo/vector-icons';
 import { ActivityIndicator,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -12,16 +11,16 @@ import { ActivityIndicator,
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Logo } from '../components/Logo';
 import { isSupabaseConfigured } from '../lib/supabase';
-import { signInWithProvider, type OAuthProvider } from '../lib/oauth';
+import { APPLE_SIGN_IN_AVAILABLE, signInWithProvider, type OAuthProvider } from '../lib/oauth';
 import { brand, radius, shadow, spacing, type, type Palette } from '../lib/theme';
 import { useTheme, useThemedStyles } from '../lib/appearance';
 
 export const CLINIC_URL = 'https://jordanxcclinic.com/';
 
 // Apple requires Sign in with Apple wherever a third-party login is offered on
-// iOS (App Store guideline 4.8), so it leads there. Android leads with Google,
-// which is also what Play sign-in lands on.
-const PROVIDERS: OAuthProvider[] = Platform.OS === 'ios' ? ['apple', 'google'] : ['google', 'apple'];
+// iOS (App Store guideline 4.8), so it leads there. Elsewhere Google is the
+// only way in — see APPLE_SIGN_IN_AVAILABLE for why Apple is iPhone only.
+const PROVIDERS: OAuthProvider[] = APPLE_SIGN_IN_AVAILABLE ? ['apple', 'google'] : ['google'];
 
 const PROVIDER_STYLE: Record<
   OAuthProvider,
