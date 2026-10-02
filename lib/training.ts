@@ -75,3 +75,22 @@ export function planPositionToday(
   if (!start || midnight(today) < midnight(start)) return null;
   return { week: currentWeekNumber(startsOn, today), day: planDayToday(today) };
 }
+
+/** Midnight on the Monday of the week a date falls in. Weeks run Monday to Sunday. */
+export function mondayOf(date: Date): Date {
+  const monday = midnight(date);
+  monday.setDate(monday.getDate() - (planDayToday(monday) - 1));
+  return monday;
+}
+
+/**
+ * Which week of a plan a calendar week is, or null for a week before the plan
+ * starts. Unlike currentWeekNumber this does not clamp to week 1: a week with
+ * no plan in it must not borrow week 1's mileage as its target.
+ */
+export function planWeekOf(startsOn: string, date: Date): number | null {
+  const monday = startMonday(startsOn);
+  if (!monday) return null;
+  const week = Math.floor(daysBetween(monday, mondayOf(date)) / 7) + 1;
+  return week >= 1 ? week : null;
+}

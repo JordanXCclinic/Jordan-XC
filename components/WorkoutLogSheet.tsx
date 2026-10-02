@@ -2,8 +2,9 @@ import { useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Button } from './Button';
-import { TextField } from './Field';
-import { parseDuration } from '../lib/format';
+import { ChipSelect, TextField } from './Field';
+import { PLAN_DAYS, localDateKey, parseDuration } from '../lib/format';
+import { planDayToday } from '../lib/training';
 import { supabase } from '../lib/supabase';
 import { radius, spacing, type, type Palette } from '../lib/theme';
 import type { Workout } from '../lib/types';
@@ -14,17 +15,36 @@ const EFFORTS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 
 type Props = {
   workout: Workout | null;
+  /** A run that is not in the plan — an extra easy day, a weekend long run. */
+  freeRun?: boolean;
   athleteId: string;
   onClose: () => void;
   onSaved: () => void;
 };
 
+/**
+ * The last week of days, today first, for "Which day?". A run forgotten
+ * yesterday belongs on yesterday's bar of the weekly mileage, not today's.
+ */
+function recentDays(): { value: string; label: string }[] {
+  return Array.from({ length: 7 }, (_, back) => {
+    const day = new Date();
+    day.setDate(day.getDate() - back);
+    const label =
+      back === 0 ? 'Today' : back === 1 ? 'Yesterday' : `${PLAN_DAYS[planDayToday(day) - 1]} ${day.getDate()}`;
+    return { value: localDateKey(day), label };
+  });
+}
+
 /** How an athlete says "done" — distance, time, and how hard it felt. */
-export function WorkoutLogSheet({ workout, athleteId, onClose, onSaved }: Props) {
+export function WorkoutLogSheet({ workout, freeRun = false, athleteId, onClose, onSaved }: Props) {
   const c = useTheme();
   const calm = useReducedMotion();
   const styles = useThemedStyles(makeStyles);
 
+  const open = workout !== null || freeRun;
+  const days = recentDays();
+  const [day, setDay] = useState(days[0]!.value);
   const [distance, setDistance] = useState('');
   const [duration, setDuration] = useState('');
   const [effort, setEffort] = useState<number | null>(null);
@@ -37,13 +57,18 @@ export function WorkoutLogSheet({ workout, athleteId, onClose, onSaved }: Props)
     setDuration('');
     setEffort(null);
     setNotes('');
+    setDay(localDateKey(new Date()));
     setError(null);
   }
 
   async function save() {
-    if (!workout) return;
+    if (!open) return;
 
     const miles = distance.trim() ? Number(distance.trim()) : null;
+    if (!workout && miles === null) {
+      setError('How far did you run? Distance is what this adds to your week.');
+      return;
+    }
     if (miles !== null && (Number.isNaN(miles) || miles <= 0)) {
       setError('Distance should be a number of miles, like 5 or 6.2.');
       return;
@@ -60,8 +85,8 @@ export function WorkoutLogSheet({ workout, athleteId, onClose, onSaved }: Props)
 
     const { error: insertError } = await supabase.from('workout_logs').insert({
       athlete_id: athleteId,
-      workout_id: workout.id,
-      logged_on: new Date().toISOString().slice(0, 10),
+      workout_id: workout?.id ?? null,
+      logged_on: day,
       distance_miles: miles,
       duration_seconds: seconds,
       effort,
@@ -80,7 +105,7 @@ export function WorkoutLogSheet({ workout, athleteId, onClose, onSaved }: Props)
 
   return (
     <Modal
-      visible={workout !== null}
+      visible={open}
       transparent
       animationType={calm ? 'none' : 'slide'}
       onRequestClose={onClose}
@@ -93,11 +118,14 @@ export function WorkoutLogSheet({ workout, athleteId, onClose, onSaved }: Props)
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          <Text style={styles.kicker}>Log this workout</Text>
-          <Text style={styles.title}>{workout?.title}</Text>
+          <Text style={styles.kicker}>{workout ? 'Log this workout' : 'Log a run'}</Text>
+          <Text style={styles.title}>{workout ? workout.title : 'A run of your own'}</Text>
+
+          <ChipSelect label="Which day?" options={days} value={day} onChange={setDay} />
 
           <TextField
             label="Distance (miles)"
+            required={!workout}
             value={distance}
             onChangeText={setDistance}
             placeholder="6.2"

@@ -43,6 +43,16 @@ export function formatDayHeading(value: Date | string): string {
   return `${DAY_NAMES[date.getDay()]}, ${date.toLocaleDateString(undefined, { month: 'long', day: 'numeric' })}`;
 }
 
+/**
+ * "2026-10-02" for the day as the phone's own clock sees it.
+ *
+ * Not toISOString().slice(0, 10): that is the date in London, so a run logged
+ * after 7 pm in Birmingham landed on tomorrow.
+ */
+export function localDateKey(date: Date): string {
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+
 export function isSameDay(a: Date, b: Date): boolean {
   return (
     a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate()
@@ -113,7 +123,7 @@ export function formatMiles(miles: number | null): string | null {
 }
 
 /** The number on its own: "6", "6.2". Shared so a range reads like a single. */
-function milesNumber(miles: number): string {
+export function milesNumber(miles: number): string {
   const trimmed = Number(miles);
   return trimmed % 1 === 0 ? trimmed.toFixed(0) : trimmed.toFixed(2).replace(/0$/, '');
 }

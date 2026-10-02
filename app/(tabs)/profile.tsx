@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { router } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
@@ -7,10 +8,11 @@ import { Badge } from '../../components/Badge';
 import { Card, ListRow } from '../../components/Card';
 import { EmptyState, Screen, SectionHeader } from '../../components/Screen';
 import { SegmentedControl } from '../../components/SegmentedControl';
+import { WeeklyMileage } from '../../components/WeeklyMileage';
 import { useAthlete } from '../../lib/athlete';
 import { useAuth } from '../../lib/auth';
 import { firstName, roleLabel } from '../../lib/format';
-import { isAthlete, isCoach } from '../../lib/types';
+import { isAthlete, isCoach, isParent } from '../../lib/types';
 import { spacing, type, type Palette } from '../../lib/theme';
 import { CLINIC_URL } from '../sign-in';
 import { useTheme, useThemedStyles } from '../../lib/appearance';
@@ -23,6 +25,7 @@ export default function ProfileTab() {
 
   const { profile, role } = useAuth();
   const { athletes, activeAthleteId, setActiveAthleteId, activeAthlete, refresh } = useAthlete();
+  const [mileageKey, setMileageKey] = useState(0);
 
   if (!profile) return null;
 
@@ -31,7 +34,13 @@ export default function ProfileTab() {
   const subject = own ? profile : activeAthlete;
 
   return (
-    <Screen title={own ? 'Me' : 'Profile'} onRefresh={refresh}>
+    <Screen
+      title={own ? 'Me' : 'Profile'}
+      onRefresh={async () => {
+        setMileageKey((key) => key + 1);
+        await refresh();
+      }}
+    >
       <Card>
         <View style={styles.identity}>
           <Avatar name={profile.full_name} size={56} />
@@ -71,6 +80,13 @@ export default function ProfileTab() {
             />
           ) : subject ? (
             <>
+              <SectionHeader title={own ? 'Your miles' : `${firstName(subject.full_name)}’s miles`} />
+              <WeeklyMileage
+                athleteId={subject.id}
+                canLog={own || isParent(role)}
+                refreshKey={mileageKey}
+              />
+
               <SectionHeader
                 title={own ? 'Your profile' : `${firstName(subject.full_name)}’s profile`}
                 action={
