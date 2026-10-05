@@ -2,7 +2,7 @@
 
 **Last updated:** 18 September 2026
 **Applies to:** the Jordan XC Clinic mobile app for iOS and Android
-**Contact:** info@jordanxcclinic.com
+**Contact:** will@jordanxcclinic.com
 
 > **Before this is published:** have whoever handles the clinic's business
 > paperwork read it. It describes what the software actually does, which is the
@@ -110,7 +110,7 @@ immediate and cannot be undone. A parent may do this on behalf of their child.
 **Correct something.** Any athlete or their guardian can edit the intake form at
 any time from the Profile tab.
 
-**Ask us directly.** Email info@jordanxcclinic.com and we will help.
+**Ask us directly.** Email will@jordanxcclinic.com and we will help.
 
 ## Security
 

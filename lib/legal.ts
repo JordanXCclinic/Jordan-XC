@@ -14,7 +14,7 @@
  */
 export const PRIVACY_POLICY_URL = 'https://jordanxcclinic.github.io/Jordan-XC/privacy.html';
 export const TERMS_URL = 'https://jordanxcclinic.github.io/Jordan-XC/terms.html';
-export const SUPPORT_EMAIL = 'info@jordanxcclinic.com';
+export const SUPPORT_EMAIL = 'will@jordanxcclinic.com';
 
 /**
  * Apple's Hide My Email hands the app a relay address instead of the family's

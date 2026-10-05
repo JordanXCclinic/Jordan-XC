@@ -27,7 +27,7 @@ function inline(s) {
     .replace(/`([^`]+)`/g, '<code>$1</code>')
     .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
     .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>')
-    // Bare email and web addresses, so "info@jordanxcclinic.com" is clickable.
+    // Bare email and web addresses, so "will@jordanxcclinic.com" is clickable.
     .replace(/\b([\w.+-]+@[\w-]+\.[\w.]+)\b/g, '<a href="mailto:$1">$1</a>')
     .replace(/(^|[\s(])(https?:\/\/[^\s)]+)/g, '$1<a href="$2">$2</a>');
 }
@@ -128,7 +128,7 @@ const shell = (title, body) => `<!DOCTYPE html>
 <main>
 ${body}
 <footer>Jordan Cross Country Clinic · Birmingham, Alabama ·
-<a href="mailto:info@jordanxcclinic.com">info@jordanxcclinic.com</a></footer>
+<a href="mailto:will@jordanxcclinic.com">will@jordanxcclinic.com</a></footer>
 </main>
 </body>
 </html>

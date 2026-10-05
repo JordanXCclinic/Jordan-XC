@@ -1,7 +1,7 @@
 # Terms of Use — Jordan XC Clinic app
 
 **Last updated:** 18 September 2026
-**Contact:** info@jordanxcclinic.com
+**Contact:** will@jordanxcclinic.com
 
 ## What this app is
 
