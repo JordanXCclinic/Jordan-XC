@@ -1268,39 +1268,113 @@ end $$;
 
 reset role;
 
--- A runner with no phone: their parent adds them with the athlete code.
-insert into auth.users (id) values ('b0000000-0000-0000-0000-000000000005');
+-- ---------------------------------------------------------------------------
+-- Claiming a runner who has a phone, and setting up one who has not.
+-- ---------------------------------------------------------------------------
+insert into auth.users (id) values
+  ('b0000000-0000-0000-0000-000000000005'),  -- parent whose runner has a phone
+  ('b0000000-0000-0000-0000-000000000006'),  -- that runner
+  ('b0000000-0000-0000-0000-000000000007'),  -- parent whose runner has no phone
+  ('b0000000-0000-0000-0000-000000000008');  -- an unrelated parent
 insert into invite_codes (code, role, full_name, season, family_id, created_by) values
-  ('SIB5ATH1', 'athlete', 'No Phone Kid',   '2026', 'b1000000-0000-0000-0000-000000000005', 'f0000000-0000-0000-0000-000000000001'),
-  ('SIB5PAR1', 'parent',  'No Phone Parent', '2026', 'b1000000-0000-0000-0000-000000000005', 'f0000000-0000-0000-0000-000000000001');
+  ('PHN1ATH1', 'athlete', 'Has Phone',          '2026', 'b2000000-0000-0000-0000-000000000001', 'f0000000-0000-0000-0000-000000000001'),
+  ('PHN1PAR1', 'parent',  'Has Phone (parent)', '2026', 'b2000000-0000-0000-0000-000000000001', 'f0000000-0000-0000-0000-000000000001'),
+  ('NOP1ATH1', 'athlete', 'No Phone',           '2026', 'b2000000-0000-0000-0000-000000000002', 'f0000000-0000-0000-0000-000000000001'),
+  ('NOP1PAR1', 'parent',  'No Phone (parent)',  '2026', 'b2000000-0000-0000-0000-000000000002', 'f0000000-0000-0000-0000-000000000001'),
+  ('OTH1ATH1', 'athlete', 'Other Kid',          '2026', 'b2000000-0000-0000-0000-000000000003', 'f0000000-0000-0000-0000-000000000001'),
+  ('OTH1PAR1', 'parent',  'Other (parent)',     '2026', 'b2000000-0000-0000-0000-000000000003', 'f0000000-0000-0000-0000-000000000001');
 
 set role authenticated;
+
+-- The parent signs in first and types their runner's athlete code before the
+-- runner has opened the app. It must not use the code up.
 select set_config('request.jwt.claim.sub', 'b0000000-0000-0000-0000-000000000005', false);
-select redeem_invite_code('SIB5PAR1');
+select redeem_invite_code('PHN1PAR1');
 do $$
-declare v_result text; v_kid uuid;
+declare v_result text;
 begin
-  v_result := add_athlete_to_family('sib5ath1');
-  select athlete_id into v_kid from guardian_links where guardian_id = auth.uid();
-  if v_result = 'managed'
-     and v_kid is not null
-     and can_view_athlete(auth.uid(), v_kid)
-     and (select role from profiles where id = v_kid) = 'athlete'
-     and (select managed from profiles where id = v_kid)
-     and (select full_name from profiles where id = v_kid) = 'No Phone Kid'
-  then raise notice 'PASS: a parent sets up their runner''s account with the athlete code';
-  else raise notice 'FAIL: managed runner not set up (returned %)', v_result;
+  v_result := add_athlete_to_family('PHN1ATH1');
+  if v_result = 'pending'
+  then raise notice 'PASS: claiming before the runner signs in waits, and says so';
+  else raise notice 'FAIL: early claim returned %', v_result;
+  end if;
+end $$;
+
+-- The runner can still sign in with their own code on their own phone.
+select set_config('request.jwt.claim.sub', 'b0000000-0000-0000-0000-000000000006', false);
+do $$
+begin
+  perform redeem_invite_code('PHN1ATH1');
+  if (select role from profiles where id = auth.uid()) = 'athlete'
+     and not (select managed from profiles where id = auth.uid())
+  then raise notice 'PASS: the runner still signs in with their own code after an early claim';
+  else raise notice 'FAIL: the runner''s account is wrong after an early claim';
   end if;
 exception when others then
-  raise notice 'FAIL: setting up a managed runner failed (%)', sqlerrm;
+  raise notice 'FAIL: an early claim locked the runner out (%)', sqlerrm;
+end $$;
+
+select set_config('request.jwt.claim.sub', 'b0000000-0000-0000-0000-000000000005', false);
+do $$
+declare v_result text;
+begin
+  v_result := add_athlete_to_family('phn1ath1');
+  if v_result = 'linked'
+     and can_view_athlete(auth.uid(), 'b0000000-0000-0000-0000-000000000006')
+  then raise notice 'PASS: the parent claims their runner with the athlete code';
+  else raise notice 'FAIL: claim after sign-in returned %', v_result;
+  end if;
+exception when others then
+  raise notice 'FAIL: claiming a signed-in runner failed (%)', sqlerrm;
+end $$;
+
+-- Another family's athlete code claims nothing.
+select set_config('request.jwt.claim.sub', 'b0000000-0000-0000-0000-000000000008', false);
+select redeem_invite_code('OTH1PAR1');
+do $$
+begin
+  perform add_athlete_to_family('PHN1ATH1');
+  raise notice 'FAIL: a parent claimed another family''s runner';
+exception when others then
+  raise notice 'PASS: another family''s athlete code is refused (%)', sqlerrm;
+end $$;
+
+-- A runner without a phone: the parent sees their name, and sets them up.
+select set_config('request.jwt.claim.sub', 'b0000000-0000-0000-0000-000000000007', false);
+select redeem_invite_code('NOP1PAR1');
+do $$
+begin
+  if (select count(*) from my_runners_to_set_up()) = 1
+     and (select runner_name from my_runners_to_set_up()) = 'No Phone'
+  then raise notice 'PASS: a parent sees their own runner waiting to be set up';
+  else raise notice 'FAIL: runners to set up were wrong';
+  end if;
+end $$;
+
+do $$
+declare v_kid uuid;
+begin
+  v_kid := set_up_runner(
+    (select family_id from my_runners_to_set_up()), '  Nolan Phone-Free  ');
+  if can_view_athlete(auth.uid(), v_kid)
+     and (select role from profiles where id = v_kid) = 'athlete'
+     and (select managed from profiles where id = v_kid)
+     and (select full_name from profiles where id = v_kid) = 'Nolan Phone-Free'
+     and (select count(*) from my_runners_to_set_up()) = 0
+     and (select role from profiles where id = auth.uid()) = 'parent'
+  then raise notice 'PASS: a parent sets up a runner without a phone by name';
+  else raise notice 'FAIL: the runner without a phone was not set up right';
+  end if;
+exception when others then
+  raise notice 'FAIL: setting up a runner without a phone failed (%)', sqlerrm;
 end $$;
 
 do $$
 begin
-  if (select role from profiles where id = auth.uid()) = 'parent'
-  then raise notice 'PASS: the parent''s own role is unchanged';
-  else raise notice 'FAIL: the parent''s role changed';
-  end if;
+  perform set_up_runner('b2000000-0000-0000-0000-000000000002', 'Again');
+  raise notice 'FAIL: the same runner was set up twice';
+exception when others then
+  raise notice 'PASS: a runner cannot be set up twice (%)', sqlerrm;
 end $$;
 
 -- The managed runner's training belongs to them, and the parent can log it.
@@ -1314,7 +1388,44 @@ exception when others then
   raise notice 'FAIL: parent could not log for their managed runner (%)', sqlerrm;
 end $$;
 
+-- Another parent sees nothing to set up in this family, and cannot set one up.
+select set_config('request.jwt.claim.sub', 'b0000000-0000-0000-0000-000000000008', false);
+do $$
+begin
+  perform set_up_runner('b2000000-0000-0000-0000-000000000002', 'Not Mine');
+  raise notice 'FAIL: a parent set up a runner in another family';
+exception when others then
+  if (select count(*) from my_runners_to_set_up()
+       where family_id = 'b2000000-0000-0000-0000-000000000002') = 0
+  then raise notice 'PASS: another family''s runner cannot be seen or set up (%)', sqlerrm;
+  else raise notice 'FAIL: another family''s runner was listed';
+  end if;
+end $$;
+
+-- An athlete is not a parent: they set up nobody.
+select set_config('request.jwt.claim.sub', 'b0000000-0000-0000-0000-000000000006', false);
+do $$
+begin
+  perform set_up_runner('b2000000-0000-0000-0000-000000000003', 'Sneaky');
+  raise notice 'FAIL: an athlete set up a runner';
+exception when others then
+  raise notice 'PASS: only a parent sets up a runner (%)', sqlerrm;
+end $$;
+
+-- Coaches see the managed runner on the roster like anyone else.
+reset role;
+set role authenticated;
+select set_config('request.jwt.claim.sub', 'f0000000-0000-0000-0000-000000000001', false);
+do $$
+begin
+  if exists (select 1 from profiles where full_name = 'Nolan Phone-Free' and managed)
+  then raise notice 'PASS: coaches see a runner without a phone on the roster';
+  else raise notice 'FAIL: coaches cannot see the runner without a phone';
+  end if;
+end $$;
+
 -- Deleting the parent's account takes the runner only they managed.
+select set_config('request.jwt.claim.sub', 'b0000000-0000-0000-0000-000000000007', false);
 create temp table managed_kid as select athlete_id as id from guardian_links where guardian_id = auth.uid();
 select delete_my_account();
 reset role;
@@ -1322,11 +1433,10 @@ do $$
 begin
   if not exists (select 1 from profiles where id = (select id from managed_kid))
      and not exists (select 1 from auth.users where id = (select id from managed_kid))
-     and not exists (select 1 from profiles where id = 'b0000000-0000-0000-0000-000000000005')
+     and not exists (select 1 from profiles where id = 'b0000000-0000-0000-0000-000000000007')
   then raise notice 'PASS: a managed runner is deleted with the last parent who managed them';
   else raise notice 'FAIL: a managed runner was left behind with no parent';
   end if;
 end $$;
 
 reset role;
-

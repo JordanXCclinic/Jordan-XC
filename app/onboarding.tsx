@@ -70,7 +70,7 @@ export default function Onboarding() {
           <Text style={styles.subtitle}>
             It came with your registration confirmation. Athletes and parents each get
             their own code, and either one can be used first. Parents: enter your parent
-            code here, even if your runner has no phone. You add them next.
+            code here, even if your runner has no phone. You can set them up next.
           </Text>
 
           <TextInput

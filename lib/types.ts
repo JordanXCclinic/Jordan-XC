@@ -16,10 +16,12 @@ export type Profile = {
   onboarded_at: string | null;
   push_token: string | null;
   notification_prefs: NotificationPrefs | null;
+  /** A runner without a phone, whose account their parent set up and runs. */
+  managed: boolean;
 };
 
 export const PROFILE_COLUMNS =
-  'id, full_name, role, date_of_birth, phone, graduation_year, onboarded_at, push_token, notification_prefs';
+  'id, full_name, role, date_of_birth, phone, graduation_year, onboarded_at, push_token, notification_prefs, managed';
 
 /**
  * The intake form. Everything here is optional except the athlete it belongs to.

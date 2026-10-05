@@ -106,7 +106,13 @@ export default function Roster() {
             {athlete.role === 'private_client' ? (
               <Badge label="One-on-one" tone="primary" />
             ) : null}
-            {!athlete.onboarded_at ? <Badge label="Setup pending" tone="warning" /> : null}
+            {athlete.managed ? (
+              // Nobody signs in as a runner without a phone, so "setup
+              // pending" would never clear; the parent does it all.
+              <Badge label="Parent manages" />
+            ) : !athlete.onboarded_at ? (
+              <Badge label="Setup pending" tone="warning" />
+            ) : null}
           </Pressable>
         ))
       )}

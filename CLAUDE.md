@@ -33,12 +33,14 @@ write path to `role`; that reopens a privilege escalation the tests cover.
 
 Athlete and parent codes share a `family_id`, and the guardian link forms
 whichever of the two redeems first, so neither has to go first. Codes are one
-pair per child. A signed-in parent uses `add_athlete_to_family()` for the rest:
-another child's parent code links them to that child, and their own family's
-athlete code sets up a **managed** runner (`profiles.managed`) for a child with
-no phone — an auth user nobody signs in as, deleted with the last parent who
-manages it. That function never touches the caller's role; a managed runner's
-role comes from the athlete code, as every role does.
+pair per child. A signed-in parent uses `add_athlete_to_family()` for another
+child's parent code, or to claim their own runner with the athlete code — which
+only links and never spends the code, so a runner with a phone can still sign
+in with it. A runner without a phone is set up by name with `set_up_runner()`,
+which spends the family's athlete code on a **managed** runner
+(`profiles.managed`): an auth user nobody signs in as, deleted with the last
+parent who manages it. Neither function touches the caller's role; a managed
+runner's role comes from the athlete code, as every role does.
 
 `supabase/tests/` runs against a plain Postgres and must stay green.
 

@@ -4,6 +4,7 @@ import * as WebBrowser from 'expo-web-browser';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { AddAthleteCard } from '../../components/AddAthleteCard';
 import { AthleteSummary } from '../../components/AthleteSummary';
+import { SetUpRunnerCards } from '../../components/SetUpRunnerCard';
 import { Avatar } from '../../components/Avatar';
 import { Badge } from '../../components/Badge';
 import { Card, ListRow } from '../../components/Card';
@@ -27,6 +28,7 @@ export default function ProfileTab() {
   const { profile, role } = useAuth();
   const { athletes, activeAthleteId, setActiveAthleteId, activeAthlete, refresh } = useAthlete();
   const [mileageKey, setMileageKey] = useState(0);
+  const [familyKey, setFamilyKey] = useState(0);
 
   if (!profile) return null;
 
@@ -39,6 +41,7 @@ export default function ProfileTab() {
       title={own ? 'Me' : 'Profile'}
       onRefresh={async () => {
         setMileageKey((key) => key + 1);
+        setFamilyKey((key) => key + 1);
         await refresh();
       }}
     >
@@ -77,7 +80,7 @@ export default function ProfileTab() {
           {!own && athletes.length === 0 ? (
             <EmptyState
               icon="people-outline"
-              message="No athlete linked yet. If your runner has a phone, the link forms when they enter their own code. If not, add them below with their athlete code."
+              message="No athlete linked yet. If your runner has a phone, they appear here once they sign in with their own code. If not, set them up below."
             />
           ) : subject ? (
             <>
@@ -112,7 +115,13 @@ export default function ProfileTab() {
           {isParent(role) ? (
             <>
               <SectionHeader title="Family" />
-              <AddAthleteCard onLinked={refresh} startOpen={athletes.length === 0} />
+              <SetUpRunnerCards onSetUp={refresh} refreshKey={familyKey} />
+              <AddAthleteCard
+                onLinked={async () => {
+                  setFamilyKey((key) => key + 1);
+                  await refresh();
+                }}
+              />
             </>
           ) : null}
         </>

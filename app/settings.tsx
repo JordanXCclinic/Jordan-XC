@@ -299,8 +299,8 @@ export default function Settings() {
               </Text>
               {profile?.role === 'parent' ? (
                 <Text style={styles.dialogText}>
-                  A runner you added with their athlete code, who has no other parent on the
-                  app, is deleted with your account.
+                  A runner you set up without a phone, who has no other parent on the app, is
+                  deleted with your account.
                 </Text>
               ) : null}
               <Text style={styles.dialogText}>

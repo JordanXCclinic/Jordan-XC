@@ -9,13 +9,14 @@ import { supabase } from '../lib/supabase';
 import { radius, spacing, type, type Palette } from '../lib/theme';
 
 /**
- * Where a parent adds a runner after their own account is set up, with either
- * code from a registration confirmation:
+ * Where a parent types a code after their own account is set up:
  *
- *   - their runner's athlete code, for a child with no phone: it sets up the
- *     child's account, which the parent then runs for them;
- *   - another child's parent code, for a second child in the clinic.
+ *   - their runner's athlete code claims a runner who signs in on their own
+ *     phone. It never uses the code up — if the runner has not signed in yet,
+ *     the link simply forms when they do.
+ *   - another child's parent code adds a second child in the clinic.
  *
+ * A runner without a phone is set up by name in SetUpRunnerCard, not here.
  * Once two children are linked, the switcher at the top of Training, Profile
  * and Meet with Coach appears by itself.
  */
@@ -57,10 +58,8 @@ export function AddAthleteCard({
     close();
     setDone(
       data === 'pending'
-        ? 'Code accepted. Your runner will appear here as soon as they sign in with their own code.'
-        : data === 'managed'
-          ? 'Added. You can now see their training, schedule, and miles, and log runs for them. Fill in their profile above.'
-          : 'Added. Tap a name at the top of Training or Profile to switch between your runners.'
+        ? 'Code accepted. Your runner appears here as soon as they sign in on their own phone. If they don’t have a phone, set them up under “Runner without a phone?” above.'
+        : 'Added. Your runner is linked to your account. With more than one, tap a name at the top of Training or Profile to switch.'
     );
   }
 
@@ -85,9 +84,9 @@ export function AddAthleteCard({
             <Ionicons name="person-add-outline" size={20} color={c.primary} />
           </View>
           <View style={styles.rowText}>
-            <Text style={styles.rowTitle}>Add an athlete</Text>
+            <Text style={styles.rowTitle}>Enter a code</Text>
             <Text style={styles.rowSubtitle}>
-              A runner without a phone, or another child in the clinic
+              Claim your runner, or add another child in the clinic
             </Text>
           </View>
           <Ionicons name="chevron-forward" size={18} color={c.textFaint} />
@@ -98,11 +97,11 @@ export function AddAthleteCard({
 
   return (
     <Card accent="primary">
-      <Text style={styles.title}>Add an athlete</Text>
+      <Text style={styles.title}>Enter a code</Text>
       <View style={styles.cases}>
         <Case
           icon="phone-portrait-outline"
-          text="Your runner doesn’t have a phone? Enter their athlete code. You’ll see everything they would, and log their runs."
+          text="Your runner has their own phone? Enter their athlete code to claim them. It stays theirs to sign in with."
         />
         <Case
           icon="people-outline"
