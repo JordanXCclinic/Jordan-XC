@@ -32,7 +32,10 @@ name and phone self-editable and everything else locked. Never add a client
 write path to `role`; that reopens a privilege escalation the tests cover.
 
 Athlete and parent codes share a `family_id`, and the guardian link forms
-whichever of the two redeems first, so neither has to go first.
+whichever of the two redeems first, so neither has to go first. Codes are one
+pair per child: a parent with more than one child redeems the first parent code
+to create the account, and each further parent code through
+`link_another_athlete()`, which links but never sets a role.
 
 `supabase/tests/` runs against a plain Postgres and must stay green.
 

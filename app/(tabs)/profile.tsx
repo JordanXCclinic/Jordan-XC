@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { router } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { AddAthleteCard } from '../../components/AddAthleteCard';
 import { AthleteSummary } from '../../components/AthleteSummary';
 import { Avatar } from '../../components/Avatar';
 import { Badge } from '../../components/Badge';
@@ -105,6 +106,13 @@ export default function ProfileTab() {
                 }
               />
               <AthleteSummary athleteId={subject.id} />
+            </>
+          ) : null}
+
+          {isParent(role) ? (
+            <>
+              <SectionHeader title="Family" />
+              <AddAthleteCard onLinked={refresh} />
             </>
           ) : null}
         </>

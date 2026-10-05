@@ -1166,3 +1166,104 @@ exception when check_violation then
 end $$;
 
 reset role;
+
+-- A parent with two children in the clinic adds the second with its parent code.
+insert into auth.users (id) values
+  ('b0000000-0000-0000-0000-000000000001'),  -- parent
+  ('b0000000-0000-0000-0000-000000000002'),  -- first child
+  ('b0000000-0000-0000-0000-000000000003'),  -- second child
+  ('b0000000-0000-0000-0000-000000000004');  -- third child, signs in late
+insert into invite_codes (code, role, full_name, season, family_id, created_by) values
+  ('SIB1ATH1', 'athlete', 'Kid One',         '2026', 'b1000000-0000-0000-0000-000000000001', 'f0000000-0000-0000-0000-000000000001'),
+  ('SIB1PAR1', 'parent',  'Kid One (parent)', '2026', 'b1000000-0000-0000-0000-000000000001', 'f0000000-0000-0000-0000-000000000001'),
+  ('SIB2ATH1', 'athlete', 'Kid Two',         '2026', 'b1000000-0000-0000-0000-000000000002', 'f0000000-0000-0000-0000-000000000001'),
+  ('SIB2PAR1', 'parent',  'Kid Two (parent)', '2026', 'b1000000-0000-0000-0000-000000000002', 'f0000000-0000-0000-0000-000000000001'),
+  ('SIB3ATH1', 'athlete', 'Kid Three',       '2026', 'b1000000-0000-0000-0000-000000000003', 'f0000000-0000-0000-0000-000000000001'),
+  ('SIB3PAR1', 'parent',  'Kid Three (parent)', '2026', 'b1000000-0000-0000-0000-000000000003', 'f0000000-0000-0000-0000-000000000001'),
+  ('SIB4ATH1', 'athlete', 'Kid Four',        '2026', 'b1000000-0000-0000-0000-000000000004', 'f0000000-0000-0000-0000-000000000001'),
+  ('SIB4PAR1', 'parent',  'Kid Four (parent)', '2026', 'b1000000-0000-0000-0000-000000000004', 'f0000000-0000-0000-0000-000000000001');
+
+set role authenticated;
+select set_config('request.jwt.claim.sub', 'b0000000-0000-0000-0000-000000000002', false);
+select redeem_invite_code('SIB1ATH1');
+select set_config('request.jwt.claim.sub', 'b0000000-0000-0000-0000-000000000003', false);
+select redeem_invite_code('SIB2ATH1');
+select set_config('request.jwt.claim.sub', 'b0000000-0000-0000-0000-000000000001', false);
+select redeem_invite_code('SIB1PAR1');
+
+do $$
+declare v_linked int;
+begin
+  v_linked := link_another_athlete('  sib2par1 ');
+  if v_linked = 1
+     and can_view_athlete(auth.uid(), 'b0000000-0000-0000-0000-000000000002')
+     and can_view_athlete(auth.uid(), 'b0000000-0000-0000-0000-000000000003')
+  then raise notice 'PASS: a parent adds their second child with its parent code';
+  else raise notice 'FAIL: second child not linked (returned %)', v_linked;
+  end if;
+exception when others then
+  raise notice 'FAIL: adding a second child failed (%)', sqlerrm;
+end $$;
+
+-- A child who has not signed in yet is linked once they do.
+do $$
+declare v_linked int;
+begin
+  v_linked := link_another_athlete('SIB3PAR1');
+  if v_linked = 0
+  then raise notice 'PASS: a code for a child not yet signed in is accepted, with nothing linked yet';
+  else raise notice 'FAIL: expected nothing linked yet, got %', v_linked;
+  end if;
+end $$;
+select set_config('request.jwt.claim.sub', 'b0000000-0000-0000-0000-000000000004', false);
+select redeem_invite_code('SIB3ATH1');
+select set_config('request.jwt.claim.sub', 'b0000000-0000-0000-0000-000000000001', false);
+do $$
+begin
+  if can_view_athlete(auth.uid(), 'b0000000-0000-0000-0000-000000000004')
+  then raise notice 'PASS: the late child is linked when they redeem their own code';
+  else raise notice 'FAIL: the late child was never linked to the parent';
+  end if;
+end $$;
+
+-- An athlete code would lock the child out of their own account: refused, unused.
+do $$
+begin
+  perform link_another_athlete('SIB4ATH1');
+  raise notice 'FAIL: a parent spent a child''s athlete code';
+exception when others then
+  raise notice 'PASS: athlete code refused for a parent (%)', sqlerrm;
+end $$;
+
+-- A used code, and anyone who is not a parent, are refused.
+do $$
+begin
+  perform link_another_athlete('SIB2PAR1');
+  raise notice 'FAIL: a used parent code was accepted again';
+exception when others then
+  raise notice 'PASS: used parent code rejected (%)', sqlerrm;
+end $$;
+
+select set_config('request.jwt.claim.sub', 'b0000000-0000-0000-0000-000000000002', false);
+do $$
+begin
+  perform link_another_athlete('SIB4PAR1');
+  raise notice 'FAIL: an athlete linked themselves to another family';
+exception when others then
+  raise notice 'PASS: only a parent account can add another athlete (%)', sqlerrm;
+end $$;
+
+reset role;
+do $$
+begin
+  if (select redeemed_at from invite_codes where code = 'SIB4ATH1') is null
+     and (select redeemed_at from invite_codes where code = 'SIB4PAR1') is null
+     and (select role from profiles where id = 'b0000000-0000-0000-0000-000000000001') = 'parent'
+     and (select count(*) from guardian_links where guardian_id = 'b0000000-0000-0000-0000-000000000001') = 3
+  then raise notice 'PASS: refused codes stay unused, and the parent is still a parent with three links';
+  else raise notice 'FAIL: refused codes or the parent''s account changed';
+  end if;
+end $$;
+
+reset role;
+
