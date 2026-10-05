@@ -24,6 +24,12 @@ type Props = {
   athleteName: string;
   submitLabel: string;
   onSaved: () => void;
+  /**
+   * Runs first when Save is pressed, after the times are checked and before
+   * anything is written. Returning false stops the save. The athlete-form
+   * screen uses it to save a managed runner's name with the rest.
+   */
+  beforeSave?: () => Promise<boolean>;
 };
 
 type Draft = {
@@ -51,7 +57,13 @@ const GRADE_OPTIONS = GRADES.map((grade) => ({ value: grade, label: grade }));
  * One component so an athlete and their parent always see the same fields, and
  * so an edit later cannot drift from what was collected at setup.
  */
-export function AthleteProfileForm({ athleteId, athleteName, submitLabel, onSaved }: Props) {
+export function AthleteProfileForm({
+  athleteId,
+  athleteName,
+  submitLabel,
+  onSaved,
+  beforeSave,
+}: Props) {
   const c = useTheme();
   const styles = useThemedStyles(makeStyles);
 
@@ -131,6 +143,11 @@ export function AthleteProfileForm({ athleteId, athleteName, submitLabel, onSave
 
     setSaving(true);
     setError(null);
+
+    if (beforeSave && !(await beforeSave())) {
+      setSaving(false);
+      return;
+    }
 
     const { error: profileError } = await supabase.from('athlete_profiles').upsert(
       {

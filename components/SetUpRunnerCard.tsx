@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { StyleSheet, Text, View } from 'react-native';
 import { Button } from './Button';
@@ -85,7 +86,7 @@ function SetUpRunner({
     if (!name.trim() || busy) return;
     setBusy(true);
     setError(null);
-    const { error: rpcError } = await supabase.rpc('set_up_runner', {
+    const { data, error: rpcError } = await supabase.rpc('set_up_runner', {
       p_family: runner.family_id,
       p_name: name,
     });
@@ -95,6 +96,14 @@ function SetUpRunner({
       return;
     }
     await onSetUp(name.trim());
+    // Straight on to the profile the runner would have filled in themselves at
+    // first sign-in, with the name they were just set up under.
+    if (data) {
+      router.push({
+        pathname: '/athlete-form',
+        params: { id: data as string, name: name.trim(), setup: '1' },
+      });
+    }
   }
 
   const first = firstName(name) || 'your runner';

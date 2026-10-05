@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { router } from 'expo-router';
+import { useCallback, useState } from 'react';
+import { router, useFocusEffect } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { AddAthleteCard } from '../../components/AddAthleteCard';
@@ -30,11 +30,23 @@ export default function ProfileTab() {
   const [mileageKey, setMileageKey] = useState(0);
   const [familyKey, setFamilyKey] = useState(0);
 
+  // Back from the form, the runner's name may have changed.
+  useFocusEffect(
+    useCallback(() => {
+      void refresh();
+    }, [refresh])
+  );
+
   if (!profile) return null;
 
   const own = isAthlete(role);
   const staff = isCoach(role);
   const subject = own ? profile : activeAthlete;
+
+  function openForm() {
+    if (!subject) return;
+    router.push({ pathname: '/athlete-form', params: { id: subject.id, name: subject.full_name } });
+  }
 
   return (
     <Screen
@@ -94,21 +106,31 @@ export default function ProfileTab() {
               <SectionHeader
                 title={own ? 'Your profile' : `${firstName(subject.full_name)}’s profile`}
                 action={
-                  <Pressable
-                    accessibilityRole="button"
-                    onPress={() =>
-                      router.push({
-                        pathname: '/athlete-form',
-                        params: { id: subject.id, name: subject.full_name },
-                      })
-                    }
-                    hitSlop={8}
-                  >
+                  <Pressable accessibilityRole="button" onPress={openForm} hitSlop={8}>
                     <Text style={styles.edit}>Edit</Text>
                   </Pressable>
                 }
               />
-              <AthleteSummary athleteId={subject.id} />
+              {!own ? (
+                // The runner's name, as something to tap: it is where a parent
+                // looks for their runner's profile, and for a runner without a
+                // phone it is the only way their profile gets filled in.
+                <ListRow
+                  icon="person-outline"
+                  title={subject.full_name}
+                  subtitle={
+                    subject.managed
+                      ? 'No phone · you manage their account. Tap to fill in their profile.'
+                      : 'Tap to fill in or update their profile'
+                  }
+                  onPress={openForm}
+                />
+              ) : null}
+              <AthleteSummary
+                athleteId={subject.id}
+                onFill={openForm}
+                fillLabel={own ? 'Fill in your profile' : `Fill in ${firstName(subject.full_name)}’s profile`}
+              />
             </>
           ) : null}
 

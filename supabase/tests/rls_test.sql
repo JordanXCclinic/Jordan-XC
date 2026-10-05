@@ -1388,6 +1388,23 @@ exception when others then
   raise notice 'FAIL: parent could not log for their managed runner (%)', sqlerrm;
 end $$;
 
+-- The parent completes their managed runner's profile, name included.
+do $$
+declare v_kid uuid;
+begin
+  select athlete_id into v_kid from guardian_links where guardian_id = auth.uid();
+  perform update_managed_runner(v_kid, '  Nolan P. Free ');
+  insert into athlete_profiles (athlete_id, school, grade) values (v_kid, 'Mountain Brook', '8th');
+  if (select full_name from profiles where id = v_kid) = 'Nolan P. Free'
+     and (select onboarded_at from profiles where id = v_kid) is not null
+     and (select school from athlete_profiles where athlete_id = v_kid) = 'Mountain Brook'
+  then raise notice 'PASS: a parent fills in their managed runner''s profile and name';
+  else raise notice 'FAIL: the managed runner''s profile was not saved';
+  end if;
+exception when others then
+  raise notice 'FAIL: filling in a managed runner''s profile failed (%)', sqlerrm;
+end $$;
+
 -- Another parent sees nothing to set up in this family, and cannot set one up.
 select set_config('request.jwt.claim.sub', 'b0000000-0000-0000-0000-000000000008', false);
 do $$
@@ -1400,6 +1417,24 @@ exception when others then
   then raise notice 'PASS: another family''s runner cannot be seen or set up (%)', sqlerrm;
   else raise notice 'FAIL: another family''s runner was listed';
   end if;
+end $$;
+
+do $$
+begin
+  perform update_managed_runner(
+    (select id from profiles where full_name = 'Nolan P. Free'), 'Renamed By Stranger');
+  raise notice 'FAIL: a stranger renamed someone else''s runner';
+exception when others then
+  raise notice 'PASS: only the managing parent can rename a runner (%)', sqlerrm;
+end $$;
+
+select set_config('request.jwt.claim.sub', 'b0000000-0000-0000-0000-000000000005', false);
+do $$
+begin
+  perform update_managed_runner('b0000000-0000-0000-0000-000000000006', 'Parent Override');
+  raise notice 'FAIL: a parent renamed a runner who has their own phone';
+exception when others then
+  raise notice 'PASS: a runner with a phone keeps charge of their own name (%)', sqlerrm;
 end $$;
 
 -- An athlete is not a parent: they set up nobody.
@@ -1418,7 +1453,7 @@ set role authenticated;
 select set_config('request.jwt.claim.sub', 'f0000000-0000-0000-0000-000000000001', false);
 do $$
 begin
-  if exists (select 1 from profiles where full_name = 'Nolan Phone-Free' and managed)
+  if exists (select 1 from profiles where full_name = 'Nolan P. Free' and managed)
   then raise notice 'PASS: coaches see a runner without a phone on the roster';
   else raise notice 'FAIL: coaches cannot see the runner without a phone';
   end if;

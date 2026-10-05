@@ -1,6 +1,8 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
+import { useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Button } from './Button';
 import { Card } from './Card';
 import { EmptyState, LoadingState } from './Screen';
 import { formatDuration } from '../lib/format';
@@ -18,7 +20,19 @@ import { useTheme, useThemedStyles } from '../lib/appearance';
  * coach's roster so the coach is never looking at a staler layout than the
  * family is.
  */
-export function AthleteSummary({ athleteId }: { athleteId: string }) {
+export function AthleteSummary({
+  athleteId,
+  onFill,
+  fillLabel = 'Fill in the profile',
+}: {
+  athleteId: string;
+  /**
+   * Offered when nothing is filled in yet, so an empty profile is a button
+   * rather than a dead end. Left out on the coach's roster, which only reads.
+   */
+  onFill?: () => void;
+  fillLabel?: string;
+}) {
   const c = useTheme();
   const styles = useThemedStyles(makeStyles);
 
@@ -44,13 +58,32 @@ export function AthleteSummary({ athleteId }: { athleteId: string }) {
     setLoading(false);
   }, [athleteId]);
 
-  useEffect(() => {
-    void load();
-  }, [load]);
+  // On focus, not just on mount: coming back from the form should show what
+  // was just saved.
+  useFocusEffect(
+    useCallback(() => {
+      void load();
+    }, [load])
+  );
 
   if (loading) return <LoadingState />;
 
   if (!profile && bests.length === 0) {
+    if (onFill) {
+      return (
+        <Card accent="primary">
+          <View style={styles.privateHead}>
+            <Ionicons name="clipboard-outline" size={16} color={c.primary} />
+            <Text style={styles.cardTitle}>Not filled in yet</Text>
+          </View>
+          <Text style={styles.body}>
+            School, grade, goals, best times, and an emergency contact. It takes a couple of
+            minutes, and the coaches use it to plan training.
+          </Text>
+          <Button label={fillLabel} icon="create-outline" full onPress={onFill} style={styles.fillButton} />
+        </Card>
+      );
+    }
     return (
       <EmptyState
         icon="clipboard-outline"
@@ -140,6 +173,7 @@ function Fact({ label, value }: { label: string; value: string }) {
 
 const makeStyles = (c: Palette) =>
   StyleSheet.create({
+  fillButton: { marginTop: spacing.lg },
   cardTitle: { ...type.heading, color: c.text },
   body: { ...type.body, color: c.textMuted },
   facts: { gap: spacing.md, marginTop: spacing.md },
