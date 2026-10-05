@@ -69,7 +69,8 @@ export default function Onboarding() {
           <Text style={styles.title}>Enter your clinic code</Text>
           <Text style={styles.subtitle}>
             It came with your registration confirmation. Athletes and parents each get
-            their own code, and either one can be used first.
+            their own code, and either one can be used first. Parents: enter your parent
+            code here, even if your runner has no phone. You add them next.
           </Text>
 
           <TextInput

@@ -9,16 +9,28 @@ import { supabase } from '../lib/supabase';
 import { radius, spacing, type, type Palette } from '../lib/theme';
 
 /**
- * For a parent with more than one child in the clinic. Each child comes with
- * its own parent code; the first one set up this account, and this is where
- * the rest go. Once two children are linked, the switcher at the top of
- * Training, Profile and Meet with Coach appears by itself.
+ * Where a parent adds a runner after their own account is set up, with either
+ * code from a registration confirmation:
+ *
+ *   - their runner's athlete code, for a child with no phone: it sets up the
+ *     child's account, which the parent then runs for them;
+ *   - another child's parent code, for a second child in the clinic.
+ *
+ * Once two children are linked, the switcher at the top of Training, Profile
+ * and Meet with Coach appears by itself.
  */
-export function AddAthleteCard({ onLinked }: { onLinked: () => Promise<void> }) {
+export function AddAthleteCard({
+  onLinked,
+  startOpen = false,
+}: {
+  onLinked: () => Promise<void>;
+  /** Open straight away for a parent with no runner linked yet. */
+  startOpen?: boolean;
+}) {
   const c = useTheme();
   const styles = useThemedStyles(makeStyles);
 
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(startOpen);
   const [code, setCode] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -34,7 +46,7 @@ export function AddAthleteCard({ onLinked }: { onLinked: () => Promise<void> }) 
     if (!code.trim() || busy) return;
     setBusy(true);
     setError(null);
-    const { data, error: rpcError } = await supabase.rpc('link_another_athlete', { p_code: code });
+    const { data, error: rpcError } = await supabase.rpc('add_athlete_to_family', { p_code: code });
     if (rpcError) {
       setBusy(false);
       setError(rpcError.message);
@@ -44,9 +56,11 @@ export function AddAthleteCard({ onLinked }: { onLinked: () => Promise<void> }) 
     setBusy(false);
     close();
     setDone(
-      (data as number | null) && (data as number) > 0
-        ? 'Added. Tap a name at the top of Training or Profile to switch between your runners.'
-        : 'Code accepted. Your runner will appear here as soon as they sign in with their own code.'
+      data === 'pending'
+        ? 'Code accepted. Your runner will appear here as soon as they sign in with their own code.'
+        : data === 'managed'
+          ? 'Added. You can now see their training, schedule, and miles, and log runs for them. Fill in their profile above.'
+          : 'Added. Tap a name at the top of Training or Profile to switch between your runners.'
     );
   }
 
@@ -71,9 +85,9 @@ export function AddAthleteCard({ onLinked }: { onLinked: () => Promise<void> }) 
             <Ionicons name="person-add-outline" size={20} color={c.primary} />
           </View>
           <View style={styles.rowText}>
-            <Text style={styles.rowTitle}>Add another athlete</Text>
+            <Text style={styles.rowTitle}>Add an athlete</Text>
             <Text style={styles.rowSubtitle}>
-              More than one runner in the clinic? Use their parent code.
+              A runner without a phone, or another child in the clinic
             </Text>
           </View>
           <Ionicons name="chevron-forward" size={18} color={c.textFaint} />
@@ -84,14 +98,20 @@ export function AddAthleteCard({ onLinked }: { onLinked: () => Promise<void> }) 
 
   return (
     <Card accent="primary">
-      <Text style={styles.title}>Add another athlete</Text>
-      <Text style={styles.body}>
-        Enter the parent code from that runner’s registration confirmation. Each child
-        has their own.
-      </Text>
+      <Text style={styles.title}>Add an athlete</Text>
+      <View style={styles.cases}>
+        <Case
+          icon="phone-portrait-outline"
+          text="Your runner doesn’t have a phone? Enter their athlete code. You’ll see everything they would, and log their runs."
+        />
+        <Case
+          icon="people-outline"
+          text="Another child in the clinic? Enter that child’s parent code."
+        />
+      </View>
       <View style={styles.field}>
         <TextField
-          label="Parent code"
+          label="Clinic code"
           value={code}
           onChangeText={(next) => {
             // The alphabet has no I, O, 0 or 1, so anything typed is upper case.
@@ -115,6 +135,17 @@ export function AddAthleteCard({ onLinked }: { onLinked: () => Promise<void> }) 
         />
       </View>
     </Card>
+  );
+}
+
+function Case({ icon, text }: { icon: 'phone-portrait-outline' | 'people-outline'; text: string }) {
+  const c = useTheme();
+  const styles = useThemedStyles(makeStyles);
+  return (
+    <View style={styles.case}>
+      <Ionicons name={icon} size={18} color={c.primary} style={styles.caseIcon} />
+      <Text style={styles.caseText}>{text}</Text>
+    </View>
   );
 }
 
@@ -153,7 +184,10 @@ const makeStyles = (c: Palette) =>
     },
     doneText: { ...type.caption, color: c.success, flex: 1 },
     title: { ...type.heading, color: c.text },
-    body: { ...type.body, color: c.textMuted, marginTop: spacing.xs },
+    cases: { gap: spacing.md, marginTop: spacing.md },
+    case: { flexDirection: 'row', gap: spacing.sm, alignItems: 'flex-start' },
+    caseIcon: { marginTop: 2 },
+    caseText: { ...type.body, color: c.textMuted, flex: 1 },
     field: { marginTop: spacing.lg },
     actions: { flexDirection: 'row', gap: spacing.md, marginTop: spacing.lg },
     action: { flex: 1 },

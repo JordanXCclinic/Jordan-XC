@@ -1192,10 +1192,10 @@ select set_config('request.jwt.claim.sub', 'b0000000-0000-0000-0000-000000000001
 select redeem_invite_code('SIB1PAR1');
 
 do $$
-declare v_linked int;
+declare v_linked text;
 begin
-  v_linked := link_another_athlete('  sib2par1 ');
-  if v_linked = 1
+  v_linked := add_athlete_to_family('  sib2par1 ');
+  if v_linked = 'linked'
      and can_view_athlete(auth.uid(), 'b0000000-0000-0000-0000-000000000002')
      and can_view_athlete(auth.uid(), 'b0000000-0000-0000-0000-000000000003')
   then raise notice 'PASS: a parent adds their second child with its parent code';
@@ -1207,10 +1207,10 @@ end $$;
 
 -- A child who has not signed in yet is linked once they do.
 do $$
-declare v_linked int;
+declare v_linked text;
 begin
-  v_linked := link_another_athlete('SIB3PAR1');
-  if v_linked = 0
+  v_linked := add_athlete_to_family('SIB3PAR1');
+  if v_linked = 'pending'
   then raise notice 'PASS: a code for a child not yet signed in is accepted, with nothing linked yet';
   else raise notice 'FAIL: expected nothing linked yet, got %', v_linked;
   end if;
@@ -1226,19 +1226,20 @@ begin
   end if;
 end $$;
 
--- An athlete code would lock the child out of their own account: refused, unused.
+-- An athlete code from a family whose parent code this parent does not hold
+-- is someone else's child: refused, and left unused.
 do $$
 begin
-  perform link_another_athlete('SIB4ATH1');
-  raise notice 'FAIL: a parent spent a child''s athlete code';
+  perform add_athlete_to_family('SIB4ATH1');
+  raise notice 'FAIL: a parent claimed another family''s child';
 exception when others then
-  raise notice 'PASS: athlete code refused for a parent (%)', sqlerrm;
+  raise notice 'PASS: athlete code from another family refused (%)', sqlerrm;
 end $$;
 
 -- A used code, and anyone who is not a parent, are refused.
 do $$
 begin
-  perform link_another_athlete('SIB2PAR1');
+  perform add_athlete_to_family('SIB2PAR1');
   raise notice 'FAIL: a used parent code was accepted again';
 exception when others then
   raise notice 'PASS: used parent code rejected (%)', sqlerrm;
@@ -1247,7 +1248,7 @@ end $$;
 select set_config('request.jwt.claim.sub', 'b0000000-0000-0000-0000-000000000002', false);
 do $$
 begin
-  perform link_another_athlete('SIB4PAR1');
+  perform add_athlete_to_family('SIB4PAR1');
   raise notice 'FAIL: an athlete linked themselves to another family';
 exception when others then
   raise notice 'PASS: only a parent account can add another athlete (%)', sqlerrm;
@@ -1262,6 +1263,68 @@ begin
      and (select count(*) from guardian_links where guardian_id = 'b0000000-0000-0000-0000-000000000001') = 3
   then raise notice 'PASS: refused codes stay unused, and the parent is still a parent with three links';
   else raise notice 'FAIL: refused codes or the parent''s account changed';
+  end if;
+end $$;
+
+reset role;
+
+-- A runner with no phone: their parent adds them with the athlete code.
+insert into auth.users (id) values ('b0000000-0000-0000-0000-000000000005');
+insert into invite_codes (code, role, full_name, season, family_id, created_by) values
+  ('SIB5ATH1', 'athlete', 'No Phone Kid',   '2026', 'b1000000-0000-0000-0000-000000000005', 'f0000000-0000-0000-0000-000000000001'),
+  ('SIB5PAR1', 'parent',  'No Phone Parent', '2026', 'b1000000-0000-0000-0000-000000000005', 'f0000000-0000-0000-0000-000000000001');
+
+set role authenticated;
+select set_config('request.jwt.claim.sub', 'b0000000-0000-0000-0000-000000000005', false);
+select redeem_invite_code('SIB5PAR1');
+do $$
+declare v_result text; v_kid uuid;
+begin
+  v_result := add_athlete_to_family('sib5ath1');
+  select athlete_id into v_kid from guardian_links where guardian_id = auth.uid();
+  if v_result = 'managed'
+     and v_kid is not null
+     and can_view_athlete(auth.uid(), v_kid)
+     and (select role from profiles where id = v_kid) = 'athlete'
+     and (select managed from profiles where id = v_kid)
+     and (select full_name from profiles where id = v_kid) = 'No Phone Kid'
+  then raise notice 'PASS: a parent sets up their runner''s account with the athlete code';
+  else raise notice 'FAIL: managed runner not set up (returned %)', v_result;
+  end if;
+exception when others then
+  raise notice 'FAIL: setting up a managed runner failed (%)', sqlerrm;
+end $$;
+
+do $$
+begin
+  if (select role from profiles where id = auth.uid()) = 'parent'
+  then raise notice 'PASS: the parent''s own role is unchanged';
+  else raise notice 'FAIL: the parent''s role changed';
+  end if;
+end $$;
+
+-- The managed runner's training belongs to them, and the parent can log it.
+do $$
+declare v_kid uuid;
+begin
+  select athlete_id into v_kid from guardian_links where guardian_id = auth.uid();
+  insert into workout_logs (athlete_id, logged_on, distance_miles) values (v_kid, current_date, 3);
+  raise notice 'PASS: a parent logs a run for the runner they manage';
+exception when others then
+  raise notice 'FAIL: parent could not log for their managed runner (%)', sqlerrm;
+end $$;
+
+-- Deleting the parent's account takes the runner only they managed.
+create temp table managed_kid as select athlete_id as id from guardian_links where guardian_id = auth.uid();
+select delete_my_account();
+reset role;
+do $$
+begin
+  if not exists (select 1 from profiles where id = (select id from managed_kid))
+     and not exists (select 1 from auth.users where id = (select id from managed_kid))
+     and not exists (select 1 from profiles where id = 'b0000000-0000-0000-0000-000000000005')
+  then raise notice 'PASS: a managed runner is deleted with the last parent who managed them';
+  else raise notice 'FAIL: a managed runner was left behind with no parent';
   end if;
 end $$;
 

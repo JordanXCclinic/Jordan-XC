@@ -124,8 +124,10 @@ export default function ProfileSetup() {
           <Card accent="primary">
             <Text style={styles.cardTitle}>Your athlete</Text>
             <Text style={styles.cardHint}>
-              Your parent code links you to your runner automatically. Once you are in, open
-              the Profile tab to fill in their school, goals, and emergency contact.
+              If your runner has their own phone, you are linked as soon as they enter their
+              code. If they do not, open the Profile tab once you are in and add them with
+              their athlete code. Either way, the Profile tab is where you fill in their
+              school, goals, and emergency contact.
             </Text>
           </Card>
           <Button

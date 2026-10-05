@@ -14,7 +14,24 @@ alter default privileges in schema public grant all on tables to anon, authentic
 alter default privileges in schema public grant all on functions to anon, authenticated;
 
 create schema auth;
-create table auth.users (id uuid primary key);
+-- The columns a SQL-created user is given (see 0019, accounts a parent
+-- manages for a runner without a phone). Supabase's table has more; these are
+-- the ones that statement names.
+create table auth.users (
+  id uuid primary key,
+  instance_id uuid,
+  aud varchar(255),
+  role varchar(255),
+  email varchar(255),
+  raw_app_meta_data jsonb,
+  raw_user_meta_data jsonb,
+  confirmation_token varchar(255),
+  recovery_token varchar(255),
+  email_change_token_new varchar(255),
+  email_change varchar(255),
+  created_at timestamptz,
+  updated_at timestamptz
+);
 grant usage on schema auth to anon, authenticated;
 
 create or replace function auth.uid() returns uuid

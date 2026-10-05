@@ -77,7 +77,7 @@ export default function ProfileTab() {
           {!own && athletes.length === 0 ? (
             <EmptyState
               icon="people-outline"
-              message="No athlete linked yet. The link forms as soon as your runner redeems their own code."
+              message="No athlete linked yet. If your runner has a phone, the link forms when they enter their own code. If not, add them below with their athlete code."
             />
           ) : subject ? (
             <>
@@ -112,7 +112,7 @@ export default function ProfileTab() {
           {isParent(role) ? (
             <>
               <SectionHeader title="Family" />
-              <AddAthleteCard onLinked={refresh} />
+              <AddAthleteCard onLinked={refresh} startOpen={athletes.length === 0} />
             </>
           ) : null}
         </>

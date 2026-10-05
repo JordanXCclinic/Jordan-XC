@@ -297,6 +297,12 @@ export default function Settings() {
                 Your profile, intake form, personal bests, training logs, and any booked
                 meetings will be permanently deleted. This cannot be undone.
               </Text>
+              {profile?.role === 'parent' ? (
+                <Text style={styles.dialogText}>
+                  A runner you added with their athlete code, who has no other parent on the
+                  app, is deleted with your account.
+                </Text>
+              ) : null}
               <Text style={styles.dialogText}>
                 If you only want to stop notifications, sign out instead.
               </Text>
