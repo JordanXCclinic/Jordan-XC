@@ -74,7 +74,12 @@ jobs:
           EXPO_WEB_BASE_URL: /${{ github.event.repository.name }}
           EXPO_PUBLIC_SUPABASE_URL: ${{ vars.EXPO_PUBLIC_SUPABASE_URL }}
           EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ vars.EXPO_PUBLIC_SUPABASE_ANON_KEY }}
-        run: npm run web:build
+        # The commit's own time and id, shown at the bottom of Settings, so
+        # anyone can tell at a glance which version they are running.
+        run: |
+          export EXPO_PUBLIC_APP_VERSION_AT="$(git log -1 --format=%cI)"
+          export EXPO_PUBLIC_APP_VERSION_ID="$(git rev-parse --short HEAD)"
+          npm run web:build
 
       - name: Confirm the build points at the real database
         env:

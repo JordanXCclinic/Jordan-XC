@@ -13,7 +13,7 @@ import { SegmentedControl } from '../components/SegmentedControl';
 import { Screen, SectionHeader } from '../components/Screen';
 import { useAppearance, type ThemeMode } from '../lib/appearance';
 import { useAuth } from '../lib/auth';
-import { roleLabel } from '../lib/format';
+import { formatDateTime, roleLabel } from '../lib/format';
 import { PRIVACY_POLICY_URL, SUPPORT_EMAIL, TERMS_URL, isPrivateRelay, providerLabel } from '../lib/legal';
 import { DEFAULT_PREFS,
   PREF_LABELS,
@@ -27,6 +27,9 @@ import { radius, spacing, type, type Palette } from '../lib/theme';
 import { CLINIC_URL } from './sign-in';
 import { useTheme, useThemedStyles } from '../lib/appearance';
 import { useReducedMotion } from '../lib/a11y';
+
+const APP_VERSION_AT = process.env.EXPO_PUBLIC_APP_VERSION_AT;
+const APP_VERSION_ID = process.env.EXPO_PUBLIC_APP_VERSION_ID;
 
 export default function Settings() {
 
@@ -280,6 +283,16 @@ export default function Settings() {
         <Text style={styles.signOutText}>Sign out</Text>
       </Pressable>
 
+      {/* Which version this is, so "has my phone got the update yet?" has an
+          answer: it should match the newest one on the website. Set by the
+          publish workflows; a local build has neither value. */}
+      {APP_VERSION_AT ? (
+        <Text style={styles.version}>
+          Version of {formatDateTime(APP_VERSION_AT)}
+          {APP_VERSION_ID ? ` · ${APP_VERSION_ID}` : ''}
+        </Text>
+      ) : null}
+
       <Modal
         visible={confirming}
         transparent
@@ -385,6 +398,7 @@ const makeStyles = (c: Palette) =>
   },
   pressed: { opacity: 0.7 },
   signOutText: { ...type.bodyStrong, color: c.textMuted },
+  version: { ...type.caption, color: c.textFaint, textAlign: 'center', marginTop: spacing.sm },
   backdrop: {
     flex: 1,
     backgroundColor: c.overlay,

@@ -75,7 +75,12 @@ jobs:
         env:
           EXPO_PUBLIC_SUPABASE_URL: ${{ vars.EXPO_PUBLIC_SUPABASE_URL }}
           EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ vars.EXPO_PUBLIC_SUPABASE_ANON_KEY }}
-        run: npx expo export --platform ios
+        # The commit's own time and id, shown at the bottom of Settings: the
+        # same values as the website, so the two can be compared.
+        run: |
+          export EXPO_PUBLIC_APP_VERSION_AT="$(git log -1 --format=%cI)"
+          export EXPO_PUBLIC_APP_VERSION_ID="$(git rev-parse --short HEAD)"
+          npx expo export --platform ios
 
       - name: Confirm the bundle points at the real database
         env:
