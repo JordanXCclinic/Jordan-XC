@@ -19,7 +19,12 @@ import { spacing, type, type Palette } from '../lib/theme';
 import { useTheme, useThemedStyles } from '../lib/appearance';
 
 type Props = {
-  athleteId: string;
+  /**
+   * The runner whose form this is. Null for a runner who does not exist yet —
+   * a parent setting up a runner without a phone at sign-up — in which case
+   * the form starts empty and createAthlete makes the runner on Save.
+   */
+  athleteId: string | null;
   /** Shown in the header so a parent can see which runner they are editing. */
   athleteName: string;
   submitLabel: string;
@@ -30,6 +35,11 @@ type Props = {
    * screen uses it to save a managed runner's name with the rest.
    */
   beforeSave?: () => Promise<boolean>;
+  /**
+   * With no athleteId: creates the runner when Save is pressed, after
+   * beforeSave, and returns their id, or null to stop the save.
+   */
+  createAthlete?: () => Promise<string | null>;
 };
 
 type Draft = {
@@ -63,6 +73,7 @@ export function AthleteProfileForm({
   submitLabel,
   onSaved,
   beforeSave,
+  createAthlete,
 }: Props) {
   const c = useTheme();
   const styles = useThemedStyles(makeStyles);
@@ -79,7 +90,8 @@ export function AthleteProfileForm({
   const [timeErrors, setTimeErrors] = useState<Record<string, string>>({});
 
   const load = useCallback(async () => {
-    if (!isSupabaseConfigured) {
+    // No runner yet means nothing saved to load: the form starts empty.
+    if (!isSupabaseConfigured || !athleteId) {
       setLoading(false);
       return;
     }
@@ -149,9 +161,15 @@ export function AthleteProfileForm({
       return;
     }
 
+    const id = athleteId ?? (createAthlete ? await createAthlete() : null);
+    if (!id) {
+      setSaving(false);
+      return;
+    }
+
     const { error: profileError } = await supabase.from('athlete_profiles').upsert(
       {
-        athlete_id: athleteId,
+        athlete_id: id,
         school: draft.school.trim() || null,
         grade: draft.grade,
         goals: draft.goals.trim() || null,
@@ -171,7 +189,7 @@ export function AthleteProfileForm({
     if (parsed.length > 0) {
       const { error: bestsError } = await supabase.from('personal_bests').upsert(
         parsed.map((best) => ({
-          athlete_id: athleteId,
+          athlete_id: id,
           event: best.event,
           result_seconds: best.seconds,
         })),
@@ -190,7 +208,7 @@ export function AthleteProfileForm({
       await supabase
         .from('personal_bests')
         .delete()
-        .eq('athlete_id', athleteId)
+        .eq('athlete_id', id)
         .in('event', cleared);
     }
 
