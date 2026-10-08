@@ -1,0 +1,72 @@
+# Sends the newest iPhone build to TestFlight (and so to App Store Connect,
+# where it can be picked for App Review).
+#
+# "Build the iPhone app" normally does this itself. This is for a build whose
+# submission did not happen — it waits for that build to finish on Expo, then
+# submits it, so a working build never has to be rebuilt just to be sent.
+#
+# Run it from the Actions tab ("Send the latest iPhone build to TestFlight").
+
+name: Send the latest iPhone build to TestFlight
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-build
+  cancel-in-progress: false
+
+jobs:
+  submit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 240
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Wait for the newest iPhone build to finish
+        id: build
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          for attempt in $(seq 1 200); do
+            json="$(npx --yes eas-cli@24 build:list --platform ios --limit 1 --json --non-interactive 2>/dev/null || true)"
+            id="$(printf '%s' "$json" | jq -r '.[0].id // empty' 2>/dev/null || true)"
+            status="$(printf '%s' "$json" | jq -r '.[0].status // empty' 2>/dev/null || true)"
+            number="$(printf '%s' "$json" | jq -r '.[0].appBuildVersion // empty' 2>/dev/null || true)"
+            echo "Newest iPhone build: number ${number:-?}, ${status:-unknown}"
+            case "$status" in
+              FINISHED)
+                echo "id=$id" >> "$GITHUB_OUTPUT"
+                exit 0
+                ;;
+              ERRORED|CANCELED)
+                echo "::error::The newest iPhone build did not finish ($status). Nothing was sent."
+                exit 1
+                ;;
+            esac
+            sleep 60
+          done
+          echo "::error::Gave up waiting for the build to finish."
+          exit 1
+
+      - name: Send it to TestFlight
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          BUILD_ID: ${{ steps.build.outputs.id }}
+        run: |
+          npx --yes eas-cli@24 submit \
+            --platform ios \
+            --profile production \
+            --id "$BUILD_ID" \
+            --non-interactive \
+            --wait

@@ -11,33 +11,12 @@ do, and the exact answers to the two privacy questionnaires.
 app that cannot be got into is rejected under Guideline 2.1 within a day, and it
 is the single most common reason a members-only app bounces.
 
-Before submitting, create a real demo athlete and put this in **App Review
-Information → Notes** in App Store Connect, and in the same field on Play
-Console:
-
-```
-This app is for families registered with the Jordan Cross Country Clinic.
-
-To review it:
-1. Tap "Continue with Apple" (or Google) and sign in with any account.
-2. When asked for a clinic code, enter:  <DEMO CODE>
-3. Complete the short profile form to enter the app.
-
-A demo account with the athlete's view is also available:
-  Email:    <demo email>
-  Password: <demo password>
-
-The Coach tab is staff-only and hidden for athlete accounts. To review it,
-use:
-  Email:    <coach demo email>
-  Password: <coach demo password>
-```
-
-Issue the demo codes from **Coach → Clinic codes**. Keep one unredeemed code in
-reserve so a re-review after a rejection is not blocked.
-
-Note that Apple's reviewers must be able to reach the **coach** side too, or
-they will flag hidden functionality. Give them a staff login.
+The step-by-step guide, with the review notes to paste, is
+`docs/app-store-connect-guide.md`. In short: issue an "App Review" code pair,
+give the reviewer the **athlete** code (they sign in with their own Apple
+Account; there are no passwords in this app), and explain the Coach tab rather
+than giving a staff login. A staff code would show the reviewer real families'
+records about minors. Offer a screen recording of the coaching tools instead.
 
 ---
 

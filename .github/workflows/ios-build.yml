@@ -16,11 +16,6 @@ name: Build the iPhone app
 
 on:
   workflow_dispatch:
-    inputs:
-      what_to_test:
-        description: What testers should look at (shown in TestFlight)
-        required: false
-        default: The latest version of the app.
 
 permissions:
   contents: read
@@ -94,12 +89,12 @@ jobs:
       - name: Build, then send to TestFlight
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
-          WHAT_TO_TEST: ${{ inputs.what_to_test }}
+        # No --what-to-test: on Expo's free plan that note makes the
+        # submission fail ("available for Enterprise plan only").
         run: |
           npx --yes eas-cli@24 build \
             --platform ios \
             --profile production \
             --auto-submit \
-            --what-to-test "$WHAT_TO_TEST" \
             --non-interactive \
             --wait
