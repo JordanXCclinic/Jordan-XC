@@ -27,6 +27,7 @@
     },
     "production": {
       "channel": "production",
+      "environment": "production",
       "autoIncrement": true,
       "android": {
         "buildType": "app-bundle"
@@ -38,7 +39,9 @@
   },
   "submit": {
     "production": {
-      "ios": {},
+      "ios": {
+        "ascAppId": "6818186128"
+      },
       "android": {
         "serviceAccountKeyPath": "./google-play-service-account.json",
         "track": "internal"

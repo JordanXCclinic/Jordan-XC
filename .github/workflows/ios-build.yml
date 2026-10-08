@@ -1,0 +1,105 @@
+# Builds a new iPhone app and sends it to TestFlight, without a Mac.
+#
+# Only for changes that cannot travel as an over-the-air update: a new Expo
+# package with native parts, the icon or name, permissions, an SDK upgrade —
+# and the build that goes to App Review, whose built-in code is what a family
+# runs the very first time they open it. Everything else goes out through
+# "Publish update to phones".
+#
+# Run it from the Actions tab ("Build the iPhone app" -> Run workflow).
+#
+# The signing certificate, provisioning profile and App Store Connect key were
+# created by the first build, run interactively from a Mac, and live on Expo.
+# This reuses them; it never creates new ones.
+
+name: Build the iPhone app
+
+on:
+  workflow_dispatch:
+    inputs:
+      what_to_test:
+        description: What testers should look at (shown in TestFlight)
+        required: false
+        default: The latest version of the app.
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-build
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    # Expo's free build queue can be slow; the build itself takes minutes.
+    timeout-minutes: 240
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Check the settings are present
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          SUPABASE_URL: ${{ vars.EXPO_PUBLIC_SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ vars.EXPO_PUBLIC_SUPABASE_ANON_KEY }}
+        run: |
+          missing=0
+          if [ -z "$EXPO_TOKEN" ]; then
+            echo "::error::Secret EXPO_TOKEN is not set."
+            missing=1
+          fi
+          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_ANON_KEY" ]; then
+            echo "::error::Repository variables EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY must both be set."
+            missing=1
+          fi
+          if [ "$missing" = 1 ]; then
+            exit 1
+          fi
+
+      - run: npm ci
+
+      - run: npm run typecheck
+
+      # The build runs on Expo's servers, which never see this repository's
+      # variables, and .env is not committed. The first iPhone build went out
+      # without the database address for exactly that reason and could not
+      # sign anyone in until an update reached it. Storing them in the
+      # project's "production" environment on Expo, which the production build
+      # profile reads, puts them into every build from here on.
+      - name: Give Expo's build servers the database address
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          SUPABASE_URL: ${{ vars.EXPO_PUBLIC_SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ vars.EXPO_PUBLIC_SUPABASE_ANON_KEY }}
+        run: |
+          npx --yes eas-cli@24 env:set production --name EXPO_PUBLIC_SUPABASE_URL \
+            --value "$SUPABASE_URL" --visibility plaintext --non-interactive
+          npx --yes eas-cli@24 env:set production --name EXPO_PUBLIC_SUPABASE_ANON_KEY \
+            --value "$SUPABASE_ANON_KEY" --visibility sensitive --non-interactive
+
+          # Names only: this repository's logs are public.
+          found="$(npx --yes eas-cli@24 env:list production --format short \
+            | grep -oE 'EXPO_PUBLIC_SUPABASE_(URL|ANON_KEY)' | sort -u | wc -l)"
+          if [ "$found" != 2 ]; then
+            echo "::error::Expo does not have both database settings for production builds, so nothing was built."
+            exit 1
+          fi
+          echo "Expo has both database settings for production builds."
+
+      - name: Build, then send to TestFlight
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          WHAT_TO_TEST: ${{ inputs.what_to_test }}
+        run: |
+          npx --yes eas-cli@24 build \
+            --platform ios \
+            --profile production \
+            --auto-submit \
+            --what-to-test "$WHAT_TO_TEST" \
+            --non-interactive \
+            --wait

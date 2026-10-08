@@ -91,9 +91,12 @@ they will flag hidden functionality. Give them a staff login.
       profile, the push key, the App Store Connect app, and the API key EAS
       submits with, and stores them with Expo. It has to be interactive: EAS
       will not create a distribution certificate in `--non-interactive` mode.
-      Builds after it can run unattended from GitHub with only `EXPO_TOKEN`.
-- [ ] **Fill in `eas.json`** — the App Store Connect app ID once the first
-      submission has created the app, and the Play service-account key.
+      Builds after it run from GitHub: Actions → "Build the iPhone app"
+      (`.github/workflows/ios-build.yml`), which also stores the Supabase
+      address and key in Expo's production environment so every build has
+      them built in.
+- [x] **App Store Connect app ID in `eas.json`** — 6818186128.
+- [ ] **Play service-account key** in `eas.json`, once the Play app exists.
 - [ ] **Screenshots** — 6.7" and 6.5" iPhone for Apple, phone and 7" tablet for
       Play. Use the Home, Training, and Schedule screens.
 - [ ] **Have the privacy policy and terms read** by whoever handles the clinic's
