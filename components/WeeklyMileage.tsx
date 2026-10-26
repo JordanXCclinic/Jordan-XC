@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Button } from './Button';
 import { Card } from './Card';
+import { DayRunsSheet } from './DayRunsSheet';
 import { WorkoutLogSheet } from './WorkoutLogSheet';
 import { useTheme, useThemedStyles } from '../lib/appearance';
 import {
@@ -52,6 +53,8 @@ export function WeeklyMileage({
   const [plan, setPlan] = useState<{ min: number; max: number } | null>(null);
   const [loading, setLoading] = useState(true);
   const [logging, setLogging] = useState(false);
+  /** The day whose runs are open, "2026-10-06". */
+  const [openDay, setOpenDay] = useState<string | null>(null);
   const assignment = useRef<{ athleteId: string; value: Assignment } | null>(null);
 
   const today = new Date();
@@ -192,16 +195,21 @@ export function WeeklyMileage({
           const future = day > today && !isSameDay(day, today);
           const isToday = isSameDay(day, today);
           const height = tallest > 0 && value > 0 ? Math.max(4, (value / tallest) * BAR_AREA) : 0;
+          const key = localDateKey(day);
+          // Each past day opens its runs, to read back or put right.
           return (
-            <View
-              key={localDateKey(day)}
-              style={styles.column}
-              accessible
+            <Pressable
+              key={key}
+              style={({ pressed }) => [styles.column, pressed && styles.pressed]}
+              disabled={future}
+              onPress={() => setOpenDay(key)}
+              accessibilityRole={future ? undefined : 'button'}
               accessibilityLabel={
                 future
                   ? `${DAY_NAMES[index]}, still to come`
                   : `${DAY_NAMES[index]}, ${value > 0 ? `${milesNumber(value)} miles` : 'no miles logged'}`
               }
+              accessibilityHint={future ? undefined : 'Shows the runs logged that day'}
             >
               <Text style={[styles.value, value === 0 && styles.valueEmpty]}>
                 {future ? '' : value > 0 ? milesNumber(value) : '–'}
@@ -217,10 +225,14 @@ export function WeeklyMileage({
                 {PLAN_DAYS[index]}
               </Text>
               <View style={[styles.todayDot, !isToday && styles.hidden]} />
-            </View>
+            </Pressable>
           );
         })}
       </View>
+
+      <Text style={styles.tapHint}>
+        {canLog ? 'Tap a day to see its runs or change one' : 'Tap a day to see its runs'}
+      </Text>
 
       {canLog ? (
         <Button
@@ -243,6 +255,14 @@ export function WeeklyMileage({
           setOffset(0);
           void load();
         }}
+      />
+
+      <DayRunsSheet
+        athleteId={athleteId}
+        day={openDay}
+        canEdit={canLog}
+        onClose={() => setOpenDay(null)}
+        onChanged={() => void load()}
       />
     </Card>
   );
@@ -348,5 +368,6 @@ const makeStyles = (c: Palette) =>
       marginTop: 3,
     },
     hidden: { opacity: 0 },
+    tapHint: { ...type.caption, color: c.textFaint, textAlign: 'center', marginTop: spacing.md },
     logButton: { marginTop: spacing.lg },
   });
