@@ -1,4 +1,4 @@
-import { isAthlete, isCoach, isHeadCoach, isParent } from '../lib/types';
+import { isAthlete, isCoach, isParent } from '../lib/types';
 import { isPrivateRelay, providerLabel } from '../lib/legal';
 
 describe('who counts as staff', () => {
@@ -9,14 +9,6 @@ describe('who counts as staff', () => {
     expect(isCoach('private_client')).toBe(false);
     expect(isCoach('parent')).toBe(false);
     expect(isCoach(undefined)).toBe(false);
-  });
-
-  it('separates the head coach from assistants', () => {
-    // Assistants run practices and write training; only the head coach hands
-    // out the codes that let a family in.
-    expect(isHeadCoach('admin')).toBe(true);
-    expect(isHeadCoach('coach')).toBe(false);
-    expect(isHeadCoach(undefined)).toBe(false);
   });
 
   it('counts one-on-one clients as athletes, since they train too', () => {

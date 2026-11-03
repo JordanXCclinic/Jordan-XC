@@ -9,8 +9,7 @@ import { SwitchRow, TextField } from '../../../components/Field';
 import { EmptyState, LoadingState, Screen, SectionHeader } from '../../../components/Screen';
 import { confirmDestructive } from '../../../lib/confirm';
 import { isSupabaseConfigured, supabase } from '../../../lib/supabase';
-import { useAuth } from '../../../lib/auth';
-import { INVITE_CODE_COLUMNS, isHeadCoach, type InviteCode } from '../../../lib/types';
+import { INVITE_CODE_COLUMNS, type InviteCode } from '../../../lib/types';
 import { roleLabel } from '../../../lib/format';
 import { radius, spacing, type, type Palette } from '../../../lib/theme';
 import { useTheme, useThemedStyles } from '../../../lib/appearance';
@@ -25,7 +24,6 @@ export default function Codes() {
 
   const styles = useThemedStyles(makeStyles);
 
-  const { role } = useAuth();
   const [name, setName] = useState('');
   const [oneOnOne, setOneOnOne] = useState(false);
   const [issued, setIssued] = useState<Issued | null>(null);
@@ -35,6 +33,10 @@ export default function Codes() {
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState<string | null>(null);
+  const [coachName, setCoachName] = useState('');
+  const [coachCode, setCoachCode] = useState<{ code: string; name: string } | null>(null);
+  const [coachError, setCoachError] = useState<string | null>(null);
+  const [coachBusy, setCoachBusy] = useState(false);
 
   const load = useCallback(async () => {
     if (!isSupabaseConfigured) {
@@ -76,6 +78,32 @@ export default function Codes() {
     if (row) {
       setIssued({ ...row, name: name.trim() });
       setName('');
+      setCopied(null);
+      await load();
+    }
+  }
+
+  // A coach code makes an assistant coach: the full Coach tab, every runner's
+  // details, and these codes too. One code, one coach, no family attached.
+  async function onCoachCode() {
+    setCoachBusy(true);
+    setCoachError(null);
+
+    const { data, error: rpcError } = await supabase.rpc('create_coach_code', {
+      p_full_name: coachName,
+      p_season: SEASON,
+    });
+
+    setCoachBusy(false);
+
+    if (rpcError) {
+      setCoachError(rpcError.message);
+      return;
+    }
+
+    if (typeof data === 'string') {
+      setCoachCode({ code: data, name: coachName.trim() });
+      setCoachName('');
       setCopied(null);
       await load();
     }
@@ -141,24 +169,11 @@ export default function Codes() {
 
   const outstanding = codes.filter((code) => !code.redeemed_at);
 
-  // Assistants can run every practice and write every plan, but letting a new
-  // family into the clinic stays with the head coach. RLS enforces it too.
-  if (!isHeadCoach(role)) {
-    return (
-      <Screen inStack title="Clinic codes">
-        <EmptyState
-          icon="lock-closed-outline"
-          message="Only the head coach issues clinic codes. Ask Coach Will for one and he can send it straight to the family."
-        />
-      </Screen>
-    );
-  }
-
   return (
     <Screen
       inStack
       title="Clinic codes"
-      subtitle={`Season ${SEASON}. Issue a pair once a family has registered on the website.`}
+      subtitle={`Season ${SEASON}. Issue a pair once a family has registered on the website, or add a coach.`}
       onRefresh={load}
       avoidKeyboard
     >
@@ -233,6 +248,71 @@ export default function Codes() {
         </Card>
       ) : null}
 
+      <Card>
+        <Text style={styles.cardTitle}>Add a coach</Text>
+        <Text style={styles.hint}>
+          An assistant coach gets the same Coach tab as you, including every runner’s details and
+          these codes, so only send one to your staff.
+        </Text>
+        <View style={styles.fields}>
+          <TextField
+            label="Coach name"
+            value={coachName}
+            onChangeText={(next) => {
+              setCoachName(next);
+              if (coachError) setCoachError(null);
+            }}
+            placeholder="Alex Coach"
+            required
+            autoCapitalize="words"
+            maxLength={80}
+          />
+        </View>
+
+        {coachError ? <Text style={styles.error}>{coachError}</Text> : null}
+
+        <Button
+          label="Make a coach code"
+          icon="people-outline"
+          variant="secondary"
+          full
+          loading={coachBusy}
+          disabled={!coachName.trim()}
+          onPress={onCoachCode}
+          style={styles.submit}
+        />
+
+        {coachCode ? (
+          <>
+            <Text style={[styles.hint, styles.coachSent]}>
+              Send this to {coachCode.name}. They sign in with Apple or Google and enter it. It
+              works once.
+            </Text>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`Copy the coach code for ${coachCode.name}`}
+              onPress={() => copy('Coach', coachCode.code)}
+              style={({ pressed }) => [styles.codeRow, pressed && styles.pressed]}
+            >
+              <View style={styles.codeText}>
+                <Text style={styles.codeLabel}>Coach</Text>
+                <Text style={styles.code}>{coachCode.code}</Text>
+              </View>
+              <View style={styles.copy}>
+                <Ionicons
+                  name={copied === 'Coach' ? 'checkmark-circle' : 'copy-outline'}
+                  size={17}
+                  color={copied === 'Coach' ? c.success : c.primary}
+                />
+                <Text style={[styles.copyText, copied === 'Coach' && styles.copiedText]}>
+                  {copied === 'Coach' ? 'Copied' : 'Copy'}
+                </Text>
+              </View>
+            </Pressable>
+          </>
+        ) : null}
+      </Card>
+
       <SectionHeader title={`Not yet used (${outstanding.length})`} />
 
       {listError ? <Text style={styles.error}>{listError}</Text> : null}
@@ -290,6 +370,7 @@ const makeStyles = (c: Palette) =>
   fields: { gap: spacing.lg, marginTop: spacing.lg },
   submit: { marginTop: spacing.lg },
   error: { ...type.caption, color: c.danger, marginTop: spacing.md },
+  coachSent: { marginTop: spacing.lg },
   codeRow: {
     flexDirection: 'row',
     alignItems: 'center',

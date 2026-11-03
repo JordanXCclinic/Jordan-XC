@@ -7,7 +7,7 @@ import { EmptyState, Screen, SectionHeader } from '../../../components/Screen';
 import { useAuth } from '../../../lib/auth';
 import { firstName } from '../../../lib/format';
 import { isSupabaseConfigured, supabase } from '../../../lib/supabase';
-import { isCoach, isHeadCoach } from '../../../lib/types';
+import { isCoach } from '../../../lib/types';
 import { radius, shadow, spacing, type, type Palette } from '../../../lib/theme';
 import { useTheme, useThemedStyles } from '../../../lib/appearance';
 
@@ -74,7 +74,7 @@ const TOOLS = [
     href: '/(tabs)/coach/codes',
     icon: 'key' as const,
     title: 'Clinic codes',
-    subtitle: 'Issue codes to registered families',
+    subtitle: 'Codes for families and coaches',
   },
 ];
 
@@ -96,9 +96,7 @@ export default function CoachHome() {
 
     const [athletes, codes, practices, meetings, drafts] = await Promise.all([
       supabase.from('profiles').select('id', count).in('role', ['athlete', 'private_client']),
-      isHeadCoach(role)
-        ? supabase.from('invite_codes').select('id', count).is('redeemed_at', null)
-        : Promise.resolve({ count: 0 }),
+      supabase.from('invite_codes').select('id', count).is('redeemed_at', null),
       supabase.from('practices').select('id', count).gte('starts_at', now).neq('status', 'cancelled'),
       supabase.from('meeting_slots').select('id', count).gte('starts_at', now).not('booked_for', 'is', null),
       supabase.from('announcements').select('id', count).is('published_at', null),
@@ -156,9 +154,7 @@ export default function CoachHome() {
       <SectionHeader title="Tools" />
 
       <View style={styles.grid}>
-        {TOOLS.filter(
-          (tool) => tool.href !== '/(tabs)/coach/codes' || isHeadCoach(role)
-        ).map((tool) => (
+        {TOOLS.map((tool) => (
           <Pressable
             key={tool.href}
             accessibilityRole="button"

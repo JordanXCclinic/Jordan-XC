@@ -8,13 +8,11 @@ import { Badge } from '../../../../components/Badge';
 import { Button } from '../../../../components/Button';
 import { Card } from '../../../../components/Card';
 import { EmptyState, LoadingState, Screen, SectionHeader } from '../../../../components/Screen';
-import { useAuth } from '../../../../lib/auth';
 import { confirmDestructive } from '../../../../lib/confirm';
 import { formatDate, formatDuration, formatMiles, roleLabel } from '../../../../lib/format';
 import { isSupabaseConfigured, supabase } from '../../../../lib/supabase';
 import { PROFILE_COLUMNS,
   WORKOUT_LOG_COLUMNS,
-  isHeadCoach,
   type AppRole,
   type Profile,
   type WorkoutLog,
@@ -36,7 +34,6 @@ export default function AthleteDetail() {
   /** Names for logs a parent entered, so the coach knows whose account it is. */
   const [loggedByNames, setLoggedByNames] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
-  const { role } = useAuth();
   const [removing, setRemoving] = useState(false);
   const [removeError, setRemoveError] = useState<string | null>(null);
 
@@ -285,26 +282,21 @@ export default function AthleteDetail() {
         ))
       )}
 
-      {/* Head coach only, matching who can issue codes. The database refuses
-          anyone else as well; hiding the button is only so an assistant is
-          not offered something that would fail. */}
-      {isHeadCoach(role) ? (
-        <View style={styles.remove}>
-          <Button
-            label="Remove from clinic"
-            variant="danger"
-            icon="person-remove-outline"
-            loading={removing}
-            onPress={() => void removeFromClinic()}
-            full
-          />
-          <Text style={styles.removeNote}>
-            For an athlete who has left, or a test account. You will see exactly who is removed before
-            anything happens.
-          </Text>
-          {removeError ? <Text style={styles.removeError}>{removeError}</Text> : null}
-        </View>
-      ) : null}
+      <View style={styles.remove}>
+        <Button
+          label="Remove from clinic"
+          variant="danger"
+          icon="person-remove-outline"
+          loading={removing}
+          onPress={() => void removeFromClinic()}
+          full
+        />
+        <Text style={styles.removeNote}>
+          For an athlete who has left, or a test account. You will see exactly who is removed before
+          anything happens.
+        </Text>
+        {removeError ? <Text style={styles.removeError}>{removeError}</Text> : null}
+      </View>
     </Screen>
   );
 }

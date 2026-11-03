@@ -48,7 +48,11 @@ runner's role comes from the athlete code, as every role does.
 
 ## Roles
 
-`admin` and `coach` are staff. `athlete` is a clinic participant. `private_client`
+`admin` and `coach` are staff: the head coach and the assistants. They have the
+same powers, including issuing codes and removing a runner from the clinic; the
+two roles differ only in their label. A coach brings on another coach with
+`create_coach_code()`, a single-use code whose role is `coach`, so the role still
+arrives through `redeem_invite_code()`. `athlete` is a clinic participant. `private_client`
 is a one-on-one coaching client — a distinct role, not a separate app or login
 system. `parent` is a guardian linked to an athlete via `guardian_links`.
 

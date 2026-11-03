@@ -152,8 +152,7 @@ exception when others then
   raise notice 'PASS: non-coach cannot generate codes (%)', sqlerrm;
 end $$;
 
--- Assistants run practices and write training, but only the head coach hands
--- out access to the clinic.
+-- Assistants have the head coach's tools (0022): they hand out codes too.
 reset role;
 insert into auth.users (id) values ('eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee');
 insert into profiles (id, full_name, role)
@@ -164,19 +163,75 @@ select set_config('request.jwt.claim.sub', 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee
 do $$
 begin
   perform create_family_codes('Someone New', '2026');
-  raise notice 'FAIL: an assistant coach issued a clinic code';
+  raise notice 'PASS: an assistant coach can issue clinic codes';
 exception when others then
-  raise notice 'PASS: an assistant coach cannot issue clinic codes (%)', sqlerrm;
+  raise notice 'FAIL: an assistant coach could not issue clinic codes (%)', sqlerrm;
 end $$;
 
 do $$
 declare n int;
 begin
-  select count(*) into n from invite_codes;
-  if n = 0 then raise notice 'PASS: an assistant coach cannot read the code table';
-  else raise notice 'FAIL: an assistant read % invite codes', n;
+  select count(*) into n from invite_codes where full_name like 'Someone New%';
+  if n = 2 then raise notice 'PASS: an assistant coach can read the code table';
+  else raise notice 'FAIL: an assistant read % of the codes they issued', n;
   end if;
 end $$;
+
+-- Coach codes: any coach can bring on another, nobody else can, and the code
+-- carries the role 'coach' through redeem_invite_code().
+reset role;
+create table coach_issued (code text);
+grant all on coach_issued to authenticated;
+set role authenticated;
+insert into coach_issued select create_coach_code('New Assistant', '2026');
+
+do $$
+declare c text;
+begin
+  select code into c from coach_issued;
+  if c ~ '^[ABCDEFGHJKLMNPQR]{10}$'
+     and exists (select 1 from invite_codes
+                  where code = c and role = 'coach' and family_id is null
+                    and full_name = 'New Assistant')
+  then raise notice 'PASS: a coach code is well formed, for one coach, with no family';
+  else raise notice 'FAIL: coach code wrong (%)', c;
+  end if;
+end $$;
+
+do $$
+begin
+  perform create_coach_code('   ', '2026');
+  raise notice 'FAIL: a coach code was made without a name';
+exception when others then
+  raise notice 'PASS: a coach code needs a name (%)', sqlerrm;
+end $$;
+
+select set_config('request.jwt.claim.sub', :athlete, false);
+do $$
+begin
+  perform create_coach_code('Sneaky Coach', '2026');
+  raise notice 'FAIL: an athlete made a coach code';
+exception when others then
+  raise notice 'PASS: an athlete cannot make a coach code (%)', sqlerrm;
+end $$;
+
+reset role;
+insert into auth.users (id) values ('eeeeeeee-eeee-eeee-eeee-000000000002');
+set role authenticated;
+select set_config('request.jwt.claim.sub', 'eeeeeeee-eeee-eeee-eeee-000000000002', false);
+select redeem_invite_code((select code from coach_issued));
+reset role;
+do $$
+begin
+  if (select role from profiles where id = 'eeeeeeee-eeee-eeee-eeee-000000000002') = 'coach'
+     and (select redeemed_by from invite_codes where code = (select code from coach_issued))
+         = 'eeeeeeee-eeee-eeee-eeee-000000000002'
+  then raise notice 'PASS: redeeming a coach code makes an assistant coach';
+  else raise notice 'FAIL: a coach code did not make a coach';
+  end if;
+end $$;
+set role authenticated;
+select set_config('request.jwt.claim.sub', 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee', false);
 
 -- They still have every other staff power.
 do $$
@@ -891,8 +946,11 @@ end $$;
 -- The assistant added earlier has served his purpose. Retiring him here keeps
 -- the reassignment test below about one departing coach and one heir, rather
 -- than about which of several staff happens to be oldest.
+-- The coach he brought on goes with him, along with the codes he issued.
 delete from practices where created_by = 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee';
-delete from auth.users where id = 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee';
+delete from invite_codes where created_by = 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee';
+delete from auth.users
+ where id in ('eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee', 'eeeeeeee-eeee-eeee-eeee-000000000002');
 
 -- The clinic's own records outlive a coach, and are handed to another coach
 -- rather than blocking the deletion or vanishing with them.
@@ -1009,13 +1067,18 @@ values ('f0000000-0000-0000-0000-000000000003', current_date);
 
 set role authenticated;
 
+-- An assistant may remove an athlete too (0022). A dry run proves it without
+-- taking the family the head coach's tests below remove for real.
 select set_config('request.jwt.claim.sub', 'f0000000-0000-0000-0000-000000000002', false);
 do $$
+declare n int;
 begin
-  perform remove_from_clinic('f0000000-0000-0000-0000-000000000003');
-  raise notice 'FAIL: an assistant coach removed an athlete';
+  select count(*) into n from remove_from_clinic('f0000000-0000-0000-0000-000000000003', true);
+  if n = 2 then raise notice 'PASS: an assistant coach can remove an athlete';
+  else raise notice 'FAIL: an assistant''s dry run named % people', n;
+  end if;
 exception when others then
-  raise notice 'PASS: an assistant coach cannot remove anyone (%)', sqlerrm;
+  raise notice 'FAIL: an assistant coach could not remove an athlete (%)', sqlerrm;
 end $$;
 
 select set_config('request.jwt.claim.sub', 'f0000000-0000-0000-0000-000000000006', false);
@@ -1105,8 +1168,7 @@ end $$;
 
 reset role;
 
--- Deleting unused codes. Only the head coach; an assistant's delete matches
--- nothing, because the code table is closed to them entirely.
+-- Deleting unused codes: any member of staff.
 insert into invite_codes (code, role, full_name, season, family_id, created_by) values
   ('DEL00001', 'athlete', 'Never Joined', '2026', 'f0000000-0000-0000-0000-000000000010',
    'f0000000-0000-0000-0000-000000000001'),
@@ -1115,25 +1177,15 @@ insert into invite_codes (code, role, full_name, season, family_id, created_by) 
 
 set role authenticated;
 select set_config('request.jwt.claim.sub', 'f0000000-0000-0000-0000-000000000002', false);
-delete from invite_codes where code in ('DEL00001', 'DEL00002');
-reset role;
-do $$
-begin
-  if (select count(*) from invite_codes where code in ('DEL00001', 'DEL00002')) = 2
-  then raise notice 'PASS: an assistant coach cannot delete codes';
-  else raise notice 'FAIL: an assistant coach deleted a code';
-  end if;
-end $$;
-
-set role authenticated;
+delete from invite_codes where code = 'DEL00001' and redeemed_at is null;
 select set_config('request.jwt.claim.sub', 'f0000000-0000-0000-0000-000000000001', false);
-delete from invite_codes where code in ('DEL00001', 'DEL00002') and redeemed_at is null;
+delete from invite_codes where code = 'DEL00002' and redeemed_at is null;
 reset role;
 do $$
 begin
   if not exists (select 1 from invite_codes where code in ('DEL00001', 'DEL00002'))
-  then raise notice 'PASS: the head coach can delete a family''s unused codes';
-  else raise notice 'FAIL: the head coach could not delete unused codes';
+  then raise notice 'PASS: the head coach and an assistant can both delete unused codes';
+  else raise notice 'FAIL: staff could not delete unused codes';
   end if;
 end $$;
 
