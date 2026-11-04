@@ -4,6 +4,7 @@ import { StyleSheet, type ColorValue } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FullScreenLoader } from '../../components/Screen';
 import { useAuth } from '../../lib/auth';
+import { useAutoNotifications } from '../../lib/useAutoNotifications';
 import { isAthlete, isCoach } from '../../lib/types';
 import { shadow, type, type Palette } from '../../lib/theme';
 import { useTheme, useThemedStyles } from '../../lib/appearance';
@@ -32,6 +33,7 @@ export default function TabsLayout() {
   const insets = useSafeAreaInsets();
 
   const { session, profile, role, loading, profileLoaded, onboarded } = useAuth();
+  useAutoNotifications();
 
   if (loading || (session && !profileLoaded)) return <FullScreenLoader />;
 

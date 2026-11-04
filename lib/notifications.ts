@@ -12,11 +12,12 @@ export type NotificationPrefs = {
   meetings: boolean;
 };
 
+/** Everything on: what a new member starts with once they allow notifications. */
 export const DEFAULT_PREFS: NotificationPrefs = {
   announcements: true,
   practices: true,
   workouts: true,
-  learn: false,
+  learn: true,
   meetings: true,
 };
 
@@ -27,7 +28,7 @@ export const PREF_LABELS: Record<keyof NotificationPrefs, { title: string; hint:
   },
   practices: { title: 'Schedule changes', hint: 'When a practice is added or moved.' },
   workouts: { title: 'New workouts', hint: 'When a coach posts training for you.' },
-  learn: { title: 'Learn sessions', hint: 'New articles and videos. Off by default.' },
+  learn: { title: 'Learn sessions', hint: 'New articles and videos from the coaches.' },
   meetings: { title: 'Meetings', hint: 'Confirmations and reminders for one-on-one times.' },
 };
 
@@ -40,9 +41,10 @@ function projectId(): string | undefined {
 /**
  * Asks for permission and stores the token against the signed-in profile.
  *
- * Called from Settings when someone switches notifications on, never on launch:
- * a permission prompt before anyone knows what the app is gets denied, and iOS
- * only offers it once.
+ * Called from Settings when someone switches notifications on, and once by
+ * useAutoNotifications when they first reach the app after signing up — never
+ * before that: a permission prompt before anyone knows what the app is gets
+ * denied, and iOS only offers it once.
  */
 export async function enableNotifications(
   profileId: string
