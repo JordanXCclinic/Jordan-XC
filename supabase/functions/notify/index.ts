@@ -26,10 +26,8 @@ const EXPO_PUSH_URL = 'https://exp.host/--/api/v2/push/send';
 const BATCH_SIZE = 100;
 
 type Message = {
-  audience: Audience;
-  /** Set when the item is for one runner: only they, their parents and staff hear. */
-  athlete: string | null;
-  pref: string;
+  /** The SQL function that lists who hears about it, and its arguments. */
+  recipients: { fn: string; args: Record<string, unknown> };
   title: string;
   body: string;
   /** Where tapping the notification should land. */
@@ -40,8 +38,14 @@ function describe(payload: WebhookPayload): Message | null {
   const row = payload.record;
   if (!row) return null;
 
+  // Posted items go to whoever can see them: push_recipients() applies the same
+  // audience rule as the row-level policies, plus the person's preference.
   const audience = (row.audience as Audience) ?? 'everyone';
   const athlete = (row.audience_athlete_id as string | null) ?? null;
+  const posted = (pref: string) => ({
+    fn: 'push_recipients',
+    args: { p_audience: audience, p_pref: pref, p_athlete: athlete },
+  });
 
   switch (payload.table) {
     case 'announcements': {
@@ -50,9 +54,7 @@ function describe(payload: WebhookPayload): Message | null {
       if (!row.published_at) return null;
       if (payload.type === 'UPDATE' && payload.old_record?.published_at) return null;
       return {
-        audience,
-        athlete,
-        pref: 'announcements',
+        recipients: posted('announcements'),
         title: String(row.title ?? 'Clinic news'),
         body: String(row.body ?? '').slice(0, 160),
         path: '/',
@@ -62,9 +64,7 @@ function describe(payload: WebhookPayload): Message | null {
     case 'practices': {
       const moved = payload.type === 'UPDATE';
       return {
-        audience,
-        athlete,
-        pref: 'practices',
+        recipients: posted('practices'),
         title: moved ? 'Practice changed' : 'New practice posted',
         body: String(row.location_name ?? 'Check the schedule for details.'),
         path: '/schedule',
@@ -75,12 +75,22 @@ function describe(payload: WebhookPayload): Message | null {
       if (!row.published_at) return null;
       if (payload.type === 'UPDATE' && payload.old_record?.published_at) return null;
       return {
-        audience,
-        athlete,
-        pref: 'learn',
+        recipients: posted('learn'),
         title: 'New from the coaches',
         body: String(row.title ?? ''),
         path: '/learn',
+      };
+    }
+
+    case 'meeting_slots': {
+      // New open times only. meeting_slot_recipients() sends one push for a
+      // sitting of several times, and none at all for later ones in it.
+      if (payload.type !== 'INSERT') return null;
+      return {
+        recipients: { fn: 'meeting_slot_recipients', args: { p_slot: row.id } },
+        title: 'New meeting times',
+        body: 'The coach opened times for one-on-ones. Book one in the app.',
+        path: '/meetings',
       };
     }
 
@@ -113,18 +123,14 @@ Deno.serve(async (request: Request) => {
     return Response.json({ sent: 0, reason: 'nothing to announce' });
   }
 
-  const response = await fetch(`${supabaseUrl}/rest/v1/rpc/push_recipients`, {
+  const response = await fetch(`${supabaseUrl}/rest/v1/rpc/${message.recipients.fn}`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       apikey: serviceKey,
       Authorization: `Bearer ${serviceKey}`,
     },
-    body: JSON.stringify({
-      p_audience: message.audience,
-      p_pref: message.pref,
-      p_athlete: message.athlete,
-    }),
+    body: JSON.stringify(message.recipients.args),
   });
 
   if (!response.ok) {

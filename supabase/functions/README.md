@@ -2,7 +2,8 @@
 
 ## `notify`
 
-Sends a push when a coach posts an announcement, a practice, or a Learn session.
+Sends a push when a coach posts an announcement, a practice, or a Learn session,
+or opens meeting times.
 
 It resolves who to send to by calling `push_recipients()`, which calls the same
 `can_see_audience()` the row-level policies use. That is deliberate: a push can
@@ -20,8 +21,8 @@ The function needs no secrets of its own — `SUPABASE_URL` and
 
 ### Wiring the triggers
 
-In the Supabase dashboard, under **Database → Webhooks**, create one webhook per
-table pointing at the function. All three are HTTP POST to the `notify` function
+In the Supabase dashboard, under **Integrations → Database Webhooks**, create one
+webhook per table pointing at the function. All four are HTTP POST to the `notify` function
 with the service role key as the Authorization header:
 
 | Name | Table | Events |
@@ -29,6 +30,7 @@ with the service role key as the Authorization header:
 | `notify_announcements` | `announcements` | Insert, Update |
 | `notify_practices` | `practices` | Insert, Update |
 | `notify_posts` | `posts` | Insert, Update |
+| `notify_meeting_slots` | `meeting_slots` | Insert |
 
 Update matters as much as Insert: a coach saves an announcement as a draft and
 publishes it later, and publishing is when it becomes news. The function checks

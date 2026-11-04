@@ -1527,3 +1527,56 @@ begin
 end $$;
 
 reset role;
+
+-- Meeting-time notifications (0023): every family with meeting notifications
+-- on, never staff, and only once per sitting of adding times.
+insert into auth.users (id) values
+  ('d1000000-0000-0000-0000-000000000001'), ('d1000000-0000-0000-0000-000000000002'),
+  ('d1000000-0000-0000-0000-000000000003'), ('d1000000-0000-0000-0000-000000000004'),
+  ('d1000000-0000-0000-0000-000000000005');
+insert into profiles (id, full_name, role, push_token, notification_prefs) values
+  ('d1000000-0000-0000-0000-000000000001', 'Slot Coach',   'admin',   'ExponentPushToken[coach]',  '{"meetings": true}'),
+  ('d1000000-0000-0000-0000-000000000002', 'Slot Runner',  'athlete', 'ExponentPushToken[runner]', '{"meetings": true}'),
+  ('d1000000-0000-0000-0000-000000000003', 'Slot Parent',  'parent',  'ExponentPushToken[parent]', '{"meetings": true}'),
+  ('d1000000-0000-0000-0000-000000000004', 'Quiet Runner', 'athlete', 'ExponentPushToken[quiet]',  '{"meetings": false}'),
+  ('d1000000-0000-0000-0000-000000000005', 'No Phone Yet', 'athlete', null,                        '{"meetings": true}');
+-- Created on a day of their own, clear of the slots earlier tests made today.
+insert into meeting_slots (id, starts_at, created_by, created_at) values
+  ('d2000000-0000-0000-0000-000000000001', now() + interval '3 days', 'd1000000-0000-0000-0000-000000000001', now() + interval '1 day'),
+  ('d2000000-0000-0000-0000-000000000002', now() + interval '3 days', 'd1000000-0000-0000-0000-000000000001', now() + interval '1 day 5 minutes'),
+  ('d2000000-0000-0000-0000-000000000003', now() + interval '4 days', 'd1000000-0000-0000-0000-000000000001', now() + interval '1 day 2 hours');
+
+do $$
+declare names text;
+begin
+  select string_agg(p.full_name, ', ' order by p.full_name) into names
+    from meeting_slot_recipients('d2000000-0000-0000-0000-000000000001') r
+    join profiles p on p.id = r.profile_id
+   where p.id::text like 'd1000000-%';
+  if names = 'Slot Parent, Slot Runner'
+  then raise notice 'PASS: new meeting times reach families with meeting notifications on, not staff';
+  else raise notice 'FAIL: meeting time recipients were %', names;
+  end if;
+
+  if not exists (select 1 from meeting_slot_recipients('d2000000-0000-0000-0000-000000000002'))
+  then raise notice 'PASS: a second time added in the same sitting sends nothing';
+  else raise notice 'FAIL: every meeting time in a sitting sent its own notification';
+  end if;
+
+  if exists (select 1 from meeting_slot_recipients('d2000000-0000-0000-0000-000000000003'))
+  then raise notice 'PASS: times added later, in a new sitting, notify again';
+  else raise notice 'FAIL: a new sitting of meeting times sent nothing';
+  end if;
+end $$;
+
+set role authenticated;
+select set_config('request.jwt.claim.sub', 'd1000000-0000-0000-0000-000000000002', false);
+do $$
+begin
+  perform meeting_slot_recipients('d2000000-0000-0000-0000-000000000003');
+  raise notice 'FAIL: a signed-in user listed push tokens';
+exception when others then
+  raise notice 'PASS: a signed-in user cannot list push tokens for meeting times (%)', sqlerrm;
+end $$;
+
+reset role;
