@@ -27,6 +27,8 @@ const BATCH_SIZE = 100;
 
 type Message = {
   audience: Audience;
+  /** Set when the item is for one runner: only they, their parents and staff hear. */
+  athlete: string | null;
   pref: string;
   title: string;
   body: string;
@@ -39,6 +41,7 @@ function describe(payload: WebhookPayload): Message | null {
   if (!row) return null;
 
   const audience = (row.audience as Audience) ?? 'everyone';
+  const athlete = (row.audience_athlete_id as string | null) ?? null;
 
   switch (payload.table) {
     case 'announcements': {
@@ -48,6 +51,7 @@ function describe(payload: WebhookPayload): Message | null {
       if (payload.type === 'UPDATE' && payload.old_record?.published_at) return null;
       return {
         audience,
+        athlete,
         pref: 'announcements',
         title: String(row.title ?? 'Clinic news'),
         body: String(row.body ?? '').slice(0, 160),
@@ -59,6 +63,7 @@ function describe(payload: WebhookPayload): Message | null {
       const moved = payload.type === 'UPDATE';
       return {
         audience,
+        athlete,
         pref: 'practices',
         title: moved ? 'Practice changed' : 'New practice posted',
         body: String(row.location_name ?? 'Check the schedule for details.'),
@@ -71,6 +76,7 @@ function describe(payload: WebhookPayload): Message | null {
       if (payload.type === 'UPDATE' && payload.old_record?.published_at) return null;
       return {
         audience,
+        athlete,
         pref: 'learn',
         title: 'New from the coaches',
         body: String(row.title ?? ''),
@@ -114,7 +120,11 @@ Deno.serve(async (request: Request) => {
       apikey: serviceKey,
       Authorization: `Bearer ${serviceKey}`,
     },
-    body: JSON.stringify({ p_audience: message.audience, p_pref: message.pref }),
+    body: JSON.stringify({
+      p_audience: message.audience,
+      p_pref: message.pref,
+      p_athlete: message.athlete,
+    }),
   });
 
   if (!response.ok) {
