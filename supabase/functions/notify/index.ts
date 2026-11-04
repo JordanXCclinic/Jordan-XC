@@ -22,6 +22,8 @@ type Recipient = { profile_id: string; push_token: string };
 
 const EXPO_PUSH_URL = 'https://exp.host/--/api/v2/push/send';
 
+const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+
 /** Expo accepts at most 100 messages per request. */
 const BATCH_SIZE = 100;
 
@@ -91,6 +93,32 @@ function describe(payload: WebhookPayload): Message | null {
         title: 'New meeting times',
         body: 'The coach opened times for one-on-ones. Book one in the app.',
         path: '/meetings',
+      };
+    }
+
+    case 'plan_assignments': {
+      // A runner given a plan. assignment_recipients() tells them and their
+      // parents, and notes it so the edits that follow do not tell them again.
+      if (payload.type !== 'INSERT') return null;
+      return {
+        recipients: { fn: 'assignment_recipients', args: { p_assignment: row.id } },
+        title: 'New training plan',
+        body: 'The coach added a training plan. Tap to see this week’s workouts.',
+        path: '/training',
+      };
+    }
+
+    case 'workouts': {
+      // Added or changed in a plan. workout_recipients() tells the runners on it
+      // at most once in 30 minutes, since a coach edits several in a row.
+      if (payload.type === 'DELETE') return null;
+      const day = DAYS[Number(row.day_of_week) - 1];
+      const when = day ? `Week ${row.week_number}, ${day}` : `Week ${row.week_number}`;
+      return {
+        recipients: { fn: 'workout_recipients', args: { p_plan: row.plan_id } },
+        title: 'Training updated',
+        body: `${String(row.title ?? 'A workout')}, ${when}. Tap to see your plan.`,
+        path: '/training',
       };
     }
 

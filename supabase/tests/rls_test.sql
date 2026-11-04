@@ -1580,3 +1580,78 @@ exception when others then
 end $$;
 
 reset role;
+
+-- Training notifications (0024): the runners on a plan and their parents, at
+-- most once in 30 minutes, with being assigned counting as the first.
+insert into auth.users (id) values
+  ('d3000000-0000-0000-0000-000000000001'), ('d3000000-0000-0000-0000-000000000002'),
+  ('d3000000-0000-0000-0000-000000000003'), ('d3000000-0000-0000-0000-000000000004'),
+  ('d3000000-0000-0000-0000-000000000005');
+insert into profiles (id, full_name, role, push_token, notification_prefs) values
+  ('d3000000-0000-0000-0000-000000000001', 'Plan Coach',    'admin',   'ExponentPushToken[plancoach]', '{"workouts": true}'),
+  ('d3000000-0000-0000-0000-000000000002', 'Plan Runner',   'athlete', 'ExponentPushToken[planrun]',   '{"workouts": true}'),
+  ('d3000000-0000-0000-0000-000000000003', 'Plan Parent',   'parent',  'ExponentPushToken[planpar]',   '{"workouts": true}'),
+  ('d3000000-0000-0000-0000-000000000004', 'Muted Runner',  'athlete', 'ExponentPushToken[planmute]',  '{"workouts": false}'),
+  ('d3000000-0000-0000-0000-000000000005', 'Not On Plan',   'athlete', 'ExponentPushToken[planoff]',   '{"workouts": true}');
+insert into guardian_links (athlete_id, guardian_id)
+values ('d3000000-0000-0000-0000-000000000002', 'd3000000-0000-0000-0000-000000000003');
+insert into training_plans (id, name, created_by)
+values ('d4000000-0000-0000-0000-000000000001', 'Winter Base', 'd3000000-0000-0000-0000-000000000001');
+insert into plan_assignments (id, plan_id, athlete_id, starts_on, assigned_by) values
+  ('d5000000-0000-0000-0000-000000000001', 'd4000000-0000-0000-0000-000000000001',
+   'd3000000-0000-0000-0000-000000000002', current_date, 'd3000000-0000-0000-0000-000000000001'),
+  ('d5000000-0000-0000-0000-000000000002', 'd4000000-0000-0000-0000-000000000001',
+   'd3000000-0000-0000-0000-000000000004', current_date, 'd3000000-0000-0000-0000-000000000001');
+
+do $$
+declare names text;
+begin
+  select string_agg(p.full_name, ', ' order by p.full_name) into names
+    from assignment_recipients('d5000000-0000-0000-0000-000000000001') r
+    join profiles p on p.id = r.profile_id;
+  if names = 'Plan Parent, Plan Runner'
+  then raise notice 'PASS: assigning a plan tells that runner and their parent';
+  else raise notice 'FAIL: assignment recipients were %', names;
+  end if;
+
+  if not exists (select 1 from workout_recipients('d4000000-0000-0000-0000-000000000001'))
+  then raise notice 'PASS: editing the plan right after assigning it sends nothing more';
+  else raise notice 'FAIL: a runner was told twice within 30 minutes';
+  end if;
+
+  update plan_notices set sent_at = now() - interval '1 hour'
+   where plan_id = 'd4000000-0000-0000-0000-000000000001';
+  select string_agg(p.full_name, ', ' order by p.full_name) into names
+    from workout_recipients('d4000000-0000-0000-0000-000000000001') r
+    join profiles p on p.id = r.profile_id;
+  if names = 'Plan Parent, Plan Runner'
+  then raise notice 'PASS: a later change tells the runners on the plan and their parents, not others';
+  else raise notice 'FAIL: workout update recipients were %', names;
+  end if;
+
+  if not exists (select 1 from workout_recipients('d4000000-0000-0000-0000-000000000001'))
+  then raise notice 'PASS: a run of edits sends one notification, not one each';
+  else raise notice 'FAIL: every workout edit sent its own notification';
+  end if;
+end $$;
+
+set role authenticated;
+select set_config('request.jwt.claim.sub', 'd3000000-0000-0000-0000-000000000002', false);
+do $$
+begin
+  perform workout_recipients('d4000000-0000-0000-0000-000000000001');
+  raise notice 'FAIL: a signed-in user listed training push tokens';
+exception when others then
+  raise notice 'PASS: a signed-in user cannot list training push tokens (%)', sqlerrm;
+end $$;
+
+do $$
+declare n int;
+begin
+  select count(*) into n from plan_notices;
+  if n = 0 then raise notice 'PASS: the notice log is closed to the app';
+  else raise notice 'FAIL: a signed-in user read % notice rows', n;
+  end if;
+end $$;
+
+reset role;
