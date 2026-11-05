@@ -69,6 +69,8 @@ export default function PlanEditor() {
   const [workouts, setWorkouts] = useState<Workout[]>([]);
   const [athletes, setAthletes] = useState<Profile[]>([]);
   const [assigned, setAssigned] = useState<Set<string>>(new Set());
+  /** Each assigned runner's pace group on this plan, 1 to 5, or null for none. */
+  const [groups, setGroups] = useState<Record<string, number | null>>({});
   const [assignError, setAssignError] = useState<string | null>(null);
   const [assigningAll, setAssigningAll] = useState(false);
   // Swapping the whole screen for a spinner on every refresh rebuilt the page
@@ -119,15 +121,16 @@ export default function PlanEditor() {
           .select(PROFILE_COLUMNS)
           .in('role', ['athlete', 'private_client'])
           .order('full_name'),
-        supabase.from('plan_assignments').select('athlete_id').eq('plan_id', id),
+        supabase.from('plan_assignments').select('athlete_id, pace_group').eq('plan_id', id),
       ]);
 
     setPlan((planRow as TrainingPlan | null) ?? null);
     setWorkouts((workoutRows as Workout[] | null) ?? []);
     setAthletes((athleteRows as Profile[] | null) ?? []);
-    setAssigned(
-      new Set(((assignRows as { athlete_id: string }[] | null) ?? []).map((row) => row.athlete_id))
-    );
+    const assignments =
+      (assignRows as { athlete_id: string; pace_group: number | null }[] | null) ?? [];
+    setAssigned(new Set(assignments.map((row) => row.athlete_id)));
+    setGroups(Object.fromEntries(assignments.map((row) => [row.athlete_id, row.pace_group])));
 
     // Who has done which session. One query for the plan rather than one per
     // workout, then matched up in memory.
@@ -422,6 +425,8 @@ export default function PlanEditor() {
 
     flip(next);
     setAssignError(null);
+    // Off the plan means out of its groups; back on starts without one.
+    if (!next) setGroups((current) => ({ ...current, [athlete.id]: null }));
 
     const { error: writeError } = next
       ? await supabase.from('plan_assignments').upsert(
@@ -444,6 +449,26 @@ export default function PlanEditor() {
       // training they were never given.
       flip(!next);
       setAssignError(`${athlete.full_name} could not be changed — ${writeError.message}`);
+    }
+  }
+
+  // The coach's paces live in a notebook at practice; the app only records which
+  // group a runner is in. Tapping the chosen group again takes them out of it.
+  async function setPaceGroup(athlete: Profile, group: number | null) {
+    if (!id) return;
+    const before = groups[athlete.id] ?? null;
+    setGroups((current) => ({ ...current, [athlete.id]: group }));
+    setAssignError(null);
+
+    const { error: writeError } = await supabase
+      .from('plan_assignments')
+      .update({ pace_group: group })
+      .eq('plan_id', id)
+      .eq('athlete_id', athlete.id);
+
+    if (writeError) {
+      setGroups((current) => ({ ...current, [athlete.id]: before }));
+      setAssignError(`${athlete.full_name}’s group could not be changed — ${writeError.message}`);
     }
   }
 
@@ -713,6 +738,8 @@ export default function PlanEditor() {
             planName={plan.name}
             assigned={assigned.has(athlete.id)}
             onToggle={(next) => void toggleAssignment(athlete, next)}
+            paceGroup={groups[athlete.id] ?? null}
+            onPaceGroup={(group) => void setPaceGroup(athlete, group)}
           />
         ))
       )}
@@ -734,11 +761,15 @@ function AssignRow({
   planName,
   assigned,
   onToggle,
+  paceGroup,
+  onPaceGroup,
 }: {
   athlete: Profile;
   planName: string;
   assigned: boolean;
   onToggle: (next: boolean) => void;
+  paceGroup: number | null;
+  onPaceGroup: (group: number | null) => void;
 }) {
   const c = useTheme();
   const styles = useThemedStyles(makeStyles);
@@ -769,38 +800,68 @@ function AssignRow({
         },
       ]}
     >
-      <Animated.View
-        style={[
-          styles.assignCheck,
-          {
-            opacity: progress,
-            // Starts a little small so it arrives rather than appears.
-            transform: [
-              { scale: progress.interpolate({ inputRange: [0, 1], outputRange: [0.6, 1] }) },
-            ],
-          },
-        ]}
-      >
-        <Ionicons name="checkmark" size={14} color={c.textInverse} />
-      </Animated.View>
+      <View style={styles.assignTop}>
+        <Animated.View
+          style={[
+            styles.assignCheck,
+            {
+              opacity: progress,
+              // Starts a little small so it arrives rather than appears.
+              transform: [
+                { scale: progress.interpolate({ inputRange: [0, 1], outputRange: [0.6, 1] }) },
+              ],
+            },
+          ]}
+        >
+          <Ionicons name="checkmark" size={14} color={c.textInverse} />
+        </Animated.View>
 
-      <View style={styles.assignText}>
-        <Text style={styles.assignName}>{athlete.full_name}</Text>
-        <Text style={styles.assignMeta}>
-          {athlete.role === 'private_client' ? 'One-on-one' : 'Clinic'}
-        </Text>
+        <View style={styles.assignText}>
+          <Text style={styles.assignName}>{athlete.full_name}</Text>
+          <Text style={styles.assignMeta}>
+            {athlete.role === 'private_client' ? 'One-on-one' : 'Clinic'}
+          </Text>
+        </View>
+
+        <Switch
+          value={assigned}
+          onValueChange={onToggle}
+          trackColor={{ true: c.primary, false: c.borderStrong }}
+          thumbColor={c.background}
+          accessibilityLabel={`Assign ${planName} to ${athlete.full_name}`}
+        />
       </View>
 
-      <Switch
-        value={assigned}
-        onValueChange={onToggle}
-        trackColor={{ true: c.primary, false: c.borderStrong }}
-        thumbColor={c.background}
-        accessibilityLabel={`Assign ${planName} to ${athlete.full_name}`}
-      />
+      {assigned ? (
+        <View style={styles.groupRow}>
+          <Text style={styles.groupLabel}>Pace group</Text>
+          {PACE_GROUPS.map((group) => {
+            const selected = paceGroup === group;
+            return (
+              <Pressable
+                key={group}
+                accessibilityRole="radio"
+                accessibilityState={{ selected }}
+                accessibilityLabel={`Pace group ${group} for ${athlete.full_name}`}
+                onPress={() => onPaceGroup(selected ? null : group)}
+                hitSlop={4}
+                style={({ pressed }) => [
+                  styles.groupChip,
+                  selected && styles.groupChipOn,
+                  pressed && styles.pressed,
+                ]}
+              >
+                <Text style={[styles.groupText, selected && styles.groupTextOn]}>{group}</Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      ) : null}
     </Animated.View>
   );
 }
+
+const PACE_GROUPS = [1, 2, 3, 4, 5];
 
 const makeStyles = (c: Palette) =>
   StyleSheet.create({
@@ -849,9 +910,6 @@ const makeStyles = (c: Palette) =>
   metaRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm, flexWrap: 'wrap' },
   body: { ...type.body, color: c.textMuted, marginTop: spacing.sm },
   assignRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
     backgroundColor: c.background,
     borderRadius: radius.lg,
     borderWidth: 1,
@@ -879,6 +937,27 @@ const makeStyles = (c: Palette) =>
     alignItems: 'center',
     justifyContent: 'center',
   },
+  assignTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.md,
+  },
+  groupRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: spacing.sm },
+  groupLabel: { ...type.caption, color: c.textMuted, marginRight: spacing.xs },
+  groupChip: {
+    width: 38,
+    height: 38,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: c.border,
+    backgroundColor: c.background,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  groupChipOn: { backgroundColor: c.primarySurface, borderColor: c.primary },
+  groupText: { ...type.bodyStrong, color: c.textMuted },
+  groupTextOn: { color: c.textInverse },
   assignText: { flex: 1 },
   assignName: { ...type.bodyStrong, color: c.text },
   assignMeta: { ...type.caption, color: c.textMuted },

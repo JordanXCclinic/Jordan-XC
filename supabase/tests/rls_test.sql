@@ -1655,3 +1655,28 @@ begin
 end $$;
 
 reset role;
+
+-- Pace groups (0025): a coach sets 1 to 5 on an assignment, nothing else, and
+-- the runner reads their own.
+set role authenticated;
+select set_config('request.jwt.claim.sub', 'd3000000-0000-0000-0000-000000000001', false);
+update plan_assignments set pace_group = 3 where id = 'd5000000-0000-0000-0000-000000000001';
+do $$
+begin
+  update plan_assignments set pace_group = 6 where id = 'd5000000-0000-0000-0000-000000000001';
+  raise notice 'FAIL: a pace group outside 1 to 5 was accepted';
+exception when others then
+  raise notice 'PASS: pace groups run from 1 to 5 (%)', sqlerrm;
+end $$;
+
+select set_config('request.jwt.claim.sub', 'd3000000-0000-0000-0000-000000000002', false);
+update plan_assignments set pace_group = 1 where id = 'd5000000-0000-0000-0000-000000000001';
+do $$
+begin
+  if (select pace_group from plan_assignments where id = 'd5000000-0000-0000-0000-000000000001') = 3
+  then raise notice 'PASS: a runner sees their pace group and cannot change it';
+  else raise notice 'FAIL: a runner could not see, or changed, their pace group';
+  end if;
+end $$;
+
+reset role;

@@ -42,6 +42,7 @@ export default function Home() {
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [practice, setPractice] = useState<Practice | null>(null);
   const [workout, setWorkout] = useState<Workout | null>(null);
+  const [paceGroup, setPaceGroup] = useState<number | null>(null);
 
   const load = useCallback(async () => {
     if (!isSupabaseConfigured) return;
@@ -77,13 +78,16 @@ export default function Home() {
     // depends on when the plan starts as well as on the calendar date.
     const { data: assignment } = await supabase
       .from('plan_assignments')
-      .select('plan_id, starts_on')
+      .select('plan_id, starts_on, pace_group')
       .eq('athlete_id', activeAthleteId)
       .order('starts_on', { ascending: false })
       .limit(1)
       .maybeSingle();
 
-    const assigned = assignment as { plan_id: string; starts_on: string } | null;
+    const assigned = assignment as
+      | { plan_id: string; starts_on: string; pace_group: number | null }
+      | null;
+    setPaceGroup(assigned?.pace_group ?? null);
     if (!assigned) {
       setWorkout(null);
       return;
@@ -153,6 +157,7 @@ export default function Home() {
               />
             ) : null}
             {workout.intensity ? <Badge label={workout.intensity} /> : null}
+            {paceGroup ? <Badge label={`Pace group ${paceGroup}`} /> : null}
           </View>
           {workout.description ? (
             <Text style={styles.workoutBody} numberOfLines={3}>

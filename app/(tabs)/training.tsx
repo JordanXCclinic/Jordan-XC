@@ -38,6 +38,7 @@ export default function Training() {
   const { athletes, activeAthleteId, setActiveAthleteId, activeAthlete } = useAthlete();
 
   const [plan, setPlan] = useState<TrainingPlan | null>(null);
+  const [paceGroup, setPaceGroup] = useState<number | null>(null);
   const [workouts, setWorkouts] = useState<Workout[]>([]);
   const [loggedIds, setLoggedIds] = useState<Set<string>>(new Set());
   const [week, setWeek] = useState(1);
@@ -55,13 +56,16 @@ export default function Training() {
 
     const { data: assignment } = await supabase
       .from('plan_assignments')
-      .select('plan_id, starts_on')
+      .select('plan_id, starts_on, pace_group')
       .eq('athlete_id', activeAthleteId)
       .order('starts_on', { ascending: false })
       .limit(1)
       .maybeSingle();
 
-    const assigned = assignment as { plan_id: string; starts_on: string } | null;
+    const assigned = assignment as
+      | { plan_id: string; starts_on: string; pace_group: number | null }
+      | null;
+    setPaceGroup(assigned?.pace_group ?? null);
     if (!assigned) {
       setPlan(null);
       setWorkouts([]);
@@ -155,6 +159,12 @@ export default function Training() {
           <Card accent="primary">
             <Text style={styles.planName}>{plan.name}</Text>
             {plan.description ? <Text style={styles.planDesc}>{plan.description}</Text> : null}
+            {/* The paces themselves are in the coach's notebook at practice. */}
+            {paceGroup ? (
+              <View style={styles.paceRow}>
+                <Badge label={`Pace group ${paceGroup}`} tone="primary" />
+              </View>
+            ) : null}
             {notStarted && start ? (
               <View style={styles.startsRow}>
                 <Ionicons name="flag-outline" size={14} color={c.primary} />
@@ -298,6 +308,7 @@ const makeStyles = (c: Palette) =>
   StyleSheet.create({
   planName: { ...type.heading, color: c.text },
   planDesc: { ...type.body, color: c.textMuted, marginTop: spacing.xs },
+  paceRow: { flexDirection: 'row', marginTop: spacing.md },
   weeks: { gap: spacing.sm, paddingVertical: spacing.xs },
   weekChip: {
     paddingHorizontal: spacing.lg,
