@@ -33,6 +33,7 @@ export function WorkoutLogSheet({ workout, freeRun = false, athleteId, onClose, 
         workoutTitle={workout?.title ?? null}
         splitCount={workout?.split_count ?? null}
         splitLabel={workout?.split_label ?? null}
+        splitLabels={workout?.split_labels ?? null}
         onCancel={onClose}
         onSaved={onSaved}
       />

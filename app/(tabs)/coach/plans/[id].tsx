@@ -21,10 +21,16 @@ import { confirmDestructive } from '../../../../lib/confirm';
 import {
   PLAN_DAYS,
   formatMileRange,
+  parseLadder,
   planDayLabel,
   splitsLabel,
   toDateInput,
 } from '../../../../lib/format';
+
+const SPLIT_KINDS = [
+  { value: 'same', label: 'All the same' },
+  { value: 'ladder', label: 'Ladder' },
+] as const;
 import { isSupabaseConfigured, supabase } from '../../../../lib/supabase';
 import { AUDIENCE_LABELS,
   PROFILE_COLUMNS,
@@ -105,6 +111,9 @@ export default function PlanEditor() {
   const [splitsOn, setSplitsOn] = useState(false);
   const [splitCount, setSplitCount] = useState('');
   const [splitLabel, setSplitLabel] = useState('');
+  /** Same distance every rep, or a ladder with a distance for each. */
+  const [splitKind, setSplitKind] = useState<'same' | 'ladder'>('same');
+  const [ladder, setLadder] = useState('');
   const [description, setDescription] = useState('');
   const [startsOn, setStartsOn] = useState(nextMonday);
   const [saving, setSaving] = useState(false);
@@ -221,6 +230,8 @@ export default function PlanEditor() {
     setSplitsOn(false);
     setSplitCount('');
     setSplitLabel('');
+    setSplitKind('same');
+    setLadder('');
     setDescription('');
     setError(null);
   }
@@ -239,6 +250,8 @@ export default function PlanEditor() {
     setSplitsOn(workout.split_count !== null);
     setSplitCount(workout.split_count === null ? '' : String(workout.split_count));
     setSplitLabel(workout.split_label ?? '');
+    setSplitKind(workout.split_labels ? 'ladder' : 'same');
+    setLadder(workout.split_labels ? workout.split_labels.join(', ') : '');
     setDescription(workout.description ?? '');
     setError(null);
   }
@@ -279,7 +292,17 @@ export default function PlanEditor() {
       ? milesMaxRaw
       : null;
 
-    const reps = splitsOn ? Number(splitCount.trim()) : null;
+    // A ladder's reps are its distances; otherwise the coach gives a count.
+    const rungs = splitsOn && splitKind === 'ladder' ? parseLadder(ladder) : null;
+    if (rungs !== null && (rungs.length < 2 || rungs.length > 30)) {
+      setError('List each rep’s distance in order, separated by commas, like 400, 800, 1200.');
+      return;
+    }
+    if (rungs?.some((rung) => rung.length > 20)) {
+      setError('Keep each distance short, like 400 or 1 mile, separated by commas.');
+      return;
+    }
+    const reps = !splitsOn ? null : rungs ? rungs.length : Number(splitCount.trim());
     if (reps !== null && (!Number.isInteger(reps) || reps < 1 || reps > 30)) {
       setError('Splits need a number of reps from 1 to 30, like 6.');
       return;
@@ -301,7 +324,8 @@ export default function PlanEditor() {
         distance_miles_max: milesMax,
         intensity: intensity.trim() || null,
         split_count: reps,
-        split_label: reps !== null ? splitLabel.trim() || null : null,
+        split_label: reps !== null && !rungs ? splitLabel.trim() || null : null,
+        split_labels: rungs,
       },
       { onConflict: 'plan_id,week_number,day_of_week' }
     );
@@ -646,6 +670,29 @@ export default function PlanEditor() {
             onValueChange={setSplitsOn}
           />
           {splitsOn ? (
+            <ChipSelect
+              label="Reps are"
+              options={SPLIT_KINDS}
+              value={splitKind}
+              onChange={setSplitKind}
+            />
+          ) : null}
+          {splitsOn && splitKind === 'ladder' ? (
+            <TextField
+              label="Each rep’s distance, in order"
+              value={ladder}
+              onChangeText={setLadder}
+              placeholder="400, 800, 1200, 800, 400"
+              hint={
+                parseLadder(ladder).length > 0
+                  ? `${parseLadder(ladder).length} reps. Separate them with commas.`
+                  : 'Separate them with commas.'
+              }
+              required
+              maxLength={300}
+            />
+          ) : null}
+          {splitsOn && splitKind === 'same' ? (
             <View style={styles.row}>
               <View style={styles.half}>
                 <TextField

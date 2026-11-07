@@ -134,16 +134,48 @@ export function formatPace(
   return `${Math.floor(perMile / 60)}:${pad(perMile % 60)} /mi`;
 }
 
-/** What a workout with splits asks for: "6 × 800m splits", or "6 splits". */
-export function splitsLabel(workout: { split_count: number | null; split_label: string | null }): string {
+/**
+ * What a workout with splits asks for: "6 × 800m splits", "6 splits", or for a
+ * ladder "Ladder: 400 · 800 · 1200".
+ */
+export function splitsLabel(workout: {
+  split_count: number | null;
+  split_label: string | null;
+  split_labels?: string[] | null;
+}): string {
+  if (workout.split_labels && workout.split_labels.length > 0) {
+    return `Ladder: ${workout.split_labels.join(' · ')}`;
+  }
   const count = workout.split_count ?? 0;
   return workout.split_label ? `${count} × ${workout.split_label} splits` : `${count} splits`;
 }
 
-/** Rep times in order: "2:45 · 2:44 · 2:46". */
-export function formatSplits(splits: number[] | null | undefined): string | null {
+/**
+ * Rep times in order: "2:45 · 2:44 · 2:46". With a ladder's distances, each
+ * time is named by its rep: "400 1:12 · 800 2:30".
+ */
+export function formatSplits(
+  splits: number[] | null | undefined,
+  labels?: string[] | null
+): string | null {
   if (!splits || splits.length === 0) return null;
-  return splits.map((seconds) => formatDuration(seconds) ?? '–').join(' · ');
+  return splits
+    .map((seconds, rep) => {
+      const time = formatDuration(seconds) ?? '–';
+      return labels?.[rep] ? `${labels[rep]} ${time}` : time;
+    })
+    .join(' · ');
+}
+
+/**
+ * A ladder typed by the coach, "400, 800, 1200", as one distance per rep. Commas
+ * separate reps so a distance can have a space in it, like "1 mile".
+ */
+export function parseLadder(text: string): string[] {
+  return text
+    .split(',')
+    .map((rep) => rep.trim())
+    .filter(Boolean);
 }
 
 export function formatMiles(miles: number | null): string | null {

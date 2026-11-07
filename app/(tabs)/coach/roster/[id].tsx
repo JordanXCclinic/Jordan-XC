@@ -27,6 +27,16 @@ import { PROFILE_COLUMNS,
 import { spacing, type, type Palette } from '../../../../lib/theme';
 import { useTheme, useThemedStyles } from '../../../../lib/appearance';
 
+type LoggedRun = WorkoutLog & {
+  workouts: { split_labels: string[] | null } | { split_labels: string[] | null }[] | null;
+};
+
+/** A ladder's distances for the workout a run was logged against, if any. */
+function ladderOf(log: LoggedRun): string[] | null {
+  const workout = Array.isArray(log.workouts) ? log.workouts[0] : log.workouts;
+  return workout?.split_labels ?? null;
+}
+
 export default function AthleteDetail() {
 
   const c = useTheme();
@@ -37,7 +47,7 @@ export default function AthleteDetail() {
   const [athlete, setAthlete] = useState<Profile | null>(null);
   const [guardians, setGuardians] = useState<Profile[]>([]);
   const [plan, setPlan] = useState<{ name: string; starts_on: string } | null>(null);
-  const [logs, setLogs] = useState<WorkoutLog[]>([]);
+  const [logs, setLogs] = useState<LoggedRun[]>([]);
   /** Names for logs a parent entered, so the coach knows whose account it is. */
   const [loggedByNames, setLoggedByNames] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
@@ -64,7 +74,8 @@ export default function AthleteDetail() {
           .maybeSingle(),
         supabase
           .from('workout_logs')
-          .select(WORKOUT_LOG_COLUMNS)
+          // The workout's ladder, if it has one, names each split by its distance.
+          .select(`${WORKOUT_LOG_COLUMNS}, workouts(split_labels)`)
           .eq('athlete_id', id)
           .order('logged_on', { ascending: false })
           .limit(10),
@@ -72,7 +83,7 @@ export default function AthleteDetail() {
 
     setAthlete((row as Profile | null) ?? null);
 
-    const logList = (logRows as WorkoutLog[] | null) ?? [];
+    const logList = (logRows as LoggedRun[] | null) ?? [];
     setLogs(logList);
 
     // Resolve only the entries somebody else wrote — a run the athlete logged
@@ -283,8 +294,10 @@ export default function AthleteDetail() {
                 .filter(Boolean)
                 .join(' · ') || 'Marked done'}
             </Text>
-            {formatSplits(log.split_seconds) ? (
-              <Text style={styles.logSplits}>Splits: {formatSplits(log.split_seconds)}</Text>
+            {formatSplits(log.split_seconds, ladderOf(log)) ? (
+              <Text style={styles.logSplits}>
+                Splits: {formatSplits(log.split_seconds, ladderOf(log))}
+              </Text>
             ) : null}
             {log.notes ? <Text style={styles.logNotes}>{log.notes}</Text> : null}
             {log.logged_by && log.logged_by !== athlete.id ? (

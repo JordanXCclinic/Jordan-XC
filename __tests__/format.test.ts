@@ -6,6 +6,7 @@ import {
   formatShortDate,
   formatSplits,
   splitsLabel,
+  parseLadder,
   parseDuration,
   parseLocalDateTime,
   planDayLabel,
@@ -176,5 +177,19 @@ describe('splitsLabel', () => {
   it('names the reps when the coach said what they are', () => {
     expect(splitsLabel({ split_count: 6, split_label: '800m' })).toBe('6 × 800m splits');
     expect(splitsLabel({ split_count: 4, split_label: null })).toBe('4 splits');
+  });
+});
+
+describe('ladders', () => {
+  it('reads a typed ladder as one distance per rep', () => {
+    expect(parseLadder('400, 800, 1200, 800, 400')).toEqual(['400', '800', '1200', '800', '400']);
+    expect(parseLadder(' 1 mile ,800,, ')).toEqual(['1 mile', '800']);
+  });
+
+  it('names a ladder and its splits by distance', () => {
+    expect(
+      splitsLabel({ split_count: 3, split_label: null, split_labels: ['400', '800', '400'] })
+    ).toBe('Ladder: 400 · 800 · 400');
+    expect(formatSplits([72, 150, 70], ['400', '800', '400'])).toBe('400 1:12 · 800 2:30 · 400 1:10');
   });
 });

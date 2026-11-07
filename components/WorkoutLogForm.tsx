@@ -38,6 +38,7 @@ export type WorkoutLogEntry = {
   /** The workout's own splits setting, so the boxes come back when editing. */
   workout_split_count: number | null;
   workout_split_label: string | null;
+  workout_split_labels: string[] | null;
 };
 
 function dayLabel(day: Date, today: Date): string {
@@ -86,6 +87,7 @@ export function WorkoutLogForm({
   workoutTitle,
   splitCount = null,
   splitLabel = null,
+  splitLabels = null,
   entry,
   onCancel,
   onSaved,
@@ -98,6 +100,8 @@ export function WorkoutLogForm({
   splitCount?: number | null;
   /** What each rep is, like "800m". */
   splitLabel?: string | null;
+  /** A ladder: each rep's own distance, in order. */
+  splitLabels?: string[] | null;
   /** A run to change. Without one, the form logs a new run. */
   entry?: WorkoutLogEntry;
   onCancel: () => void;
@@ -244,14 +248,16 @@ export function WorkoutLogForm({
       {splits.length > 0 ? (
         <View style={styles.splitsBlock}>
           <Text style={styles.label}>
-            Splits{splitLabel ? ` · ${splits.length} × ${splitLabel}` : ''}
+            {splitLabels && splitLabels.length > 0
+              ? 'Splits · ladder'
+              : `Splits${splitLabel ? ` · ${splits.length} × ${splitLabel}` : ''}`}
           </Text>
           <Text style={styles.hint}>Each rep’s time, like 2:45. Leave the end blank for reps you didn’t run.</Text>
           <View style={styles.splits}>
             {splits.map((split, rep) => (
               <View key={rep} style={styles.split}>
                 <TextField
-                  label={`Rep ${rep + 1}`}
+                  label={splitLabels?.[rep] ? `Rep ${rep + 1} · ${splitLabels[rep]}` : `Rep ${rep + 1}`}
                   value={split}
                   onChangeText={(next) =>
                     setSplits((current) => current.map((value, index) => (index === rep ? next : value)))

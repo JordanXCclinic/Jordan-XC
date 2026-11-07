@@ -127,11 +127,13 @@ export type Workout = {
   split_count: number | null;
   /** What each rep is, like "800m". */
   split_label: string | null;
+  /** A ladder: each rep's distance in order, one per rep. Null when all the same. */
+  split_labels: string[] | null;
 };
 
 export const WORKOUT_COLUMNS =
   'id, plan_id, week_number, day_of_week, title, description, distance_miles, '
-  + 'distance_miles_max, intensity, split_count, split_label';
+  + 'distance_miles_max, intensity, split_count, split_label, split_labels';
 
 export type MeetingSlot = {
   id: string;

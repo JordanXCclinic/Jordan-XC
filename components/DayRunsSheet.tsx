@@ -18,11 +18,16 @@ import { round2 } from '../lib/mileage';
 import { supabase } from '../lib/supabase';
 import { radius, spacing, type, type Palette } from '../lib/theme';
 
-type EmbeddedWorkout = { title: string; split_count: number | null; split_label: string | null };
+type EmbeddedWorkout = {
+  title: string;
+  split_count: number | null;
+  split_label: string | null;
+  split_labels: string[] | null;
+};
 
 type LogRow = Omit<
   WorkoutLogEntry,
-  'workout_title' | 'workout_split_count' | 'workout_split_label'
+  'workout_title' | 'workout_split_count' | 'workout_split_label' | 'workout_split_labels'
 > & {
   // A many-to-one embed, which PostgREST returns as an object; read an array
   // too rather than trust the inference.
@@ -37,6 +42,7 @@ function toEntry(row: LogRow): WorkoutLogEntry {
     workout_title: workout?.title ?? null,
     workout_split_count: workout?.split_count ?? null,
     workout_split_label: workout?.split_label ?? null,
+    workout_split_labels: workout?.split_labels ?? null,
   };
 }
 
@@ -74,7 +80,7 @@ export function DayRunsSheet({
       .from('workout_logs')
       .select(
         'id, workout_id, logged_on, distance_miles, duration_seconds, effort, notes, split_seconds, '
-          + 'workouts(title, split_count, split_label)'
+          + 'workouts(title, split_count, split_label, split_labels)'
       )
       .eq('athlete_id', athleteId)
       .eq('logged_on', day)
@@ -118,6 +124,7 @@ export function DayRunsSheet({
           workoutTitle={editing.workout_title}
           splitCount={editing.workout_split_count}
           splitLabel={editing.workout_split_label}
+          splitLabels={editing.workout_split_labels}
           entry={editing}
           onCancel={() => setEditing(null)}
           onSaved={changed}
@@ -171,7 +178,7 @@ function RunRow({ run, onPress }: { run: WorkoutLogEntry; onPress?: () => void }
     formatPace(run.distance_miles, run.duration_seconds),
     run.effort ? `Effort ${run.effort}/10` : null,
   ].filter((fact): fact is string => Boolean(fact));
-  const splits = formatSplits(run.split_seconds);
+  const splits = formatSplits(run.split_seconds, run.workout_split_labels);
   const title = run.workout_title ?? 'Run';
 
   const body = (

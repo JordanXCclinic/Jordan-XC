@@ -1737,3 +1737,24 @@ begin
 exception when others then
   raise notice 'PASS: a workout has at most 30 splits (%)', sqlerrm;
 end $$;
+
+-- Ladders (0027): a distance per rep, exactly one for each.
+reset role;
+do $$
+begin
+  update workouts set split_count = 5, split_label = null,
+                      split_labels = array['400', '800', '1200', '800', '400']
+   where id = 'd6000000-0000-0000-0000-000000000001';
+  raise notice 'PASS: a workout can be a ladder with a distance for each rep';
+exception when others then
+  raise notice 'FAIL: a ladder could not be saved (%)', sqlerrm;
+end $$;
+
+do $$
+begin
+  update workouts set split_labels = array['400', '800']
+   where id = 'd6000000-0000-0000-0000-000000000001';
+  raise notice 'FAIL: a ladder with fewer distances than reps was saved';
+exception when others then
+  raise notice 'PASS: a ladder names every rep, no more and no fewer (%)', sqlerrm;
+end $$;
