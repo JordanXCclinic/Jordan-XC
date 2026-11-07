@@ -117,6 +117,35 @@ export function formatDuration(seconds: number | null): string | null {
   return hours > 0 ? `${hours}:${pad(minutes)}:${pad(secs)}` : `${minutes}:${pad(secs)}`;
 }
 
+/**
+ * Pace from a run's distance and time: "7:32 /mi". Worked out wherever a run is
+ * shown rather than stored, so it can never disagree with the distance and time
+ * it came from. Null when either is missing or not a real number.
+ */
+export function formatPace(
+  miles: number | string | null | undefined,
+  seconds: number | null | undefined
+): string | null {
+  const distance = Number(miles);
+  if (!seconds || seconds <= 0 || !Number.isFinite(distance) || distance <= 0) return null;
+  const perMile = Math.round(seconds / distance);
+  // Anything slower than an hour a mile is a typo in the distance, not a pace.
+  if (perMile >= 3600) return null;
+  return `${Math.floor(perMile / 60)}:${pad(perMile % 60)} /mi`;
+}
+
+/** What a workout with splits asks for: "6 × 800m splits", or "6 splits". */
+export function splitsLabel(workout: { split_count: number | null; split_label: string | null }): string {
+  const count = workout.split_count ?? 0;
+  return workout.split_label ? `${count} × ${workout.split_label} splits` : `${count} splits`;
+}
+
+/** Rep times in order: "2:45 · 2:44 · 2:46". */
+export function formatSplits(splits: number[] | null | undefined): string | null {
+  if (!splits || splits.length === 0) return null;
+  return splits.map((seconds) => formatDuration(seconds) ?? '–').join(' · ');
+}
+
 export function formatMiles(miles: number | null): string | null {
   if (miles === null) return null;
   return `${milesNumber(miles)} mi`;

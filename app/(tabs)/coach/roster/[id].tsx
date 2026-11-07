@@ -9,7 +9,14 @@ import { Button } from '../../../../components/Button';
 import { Card } from '../../../../components/Card';
 import { EmptyState, LoadingState, Screen, SectionHeader } from '../../../../components/Screen';
 import { confirmDestructive } from '../../../../lib/confirm';
-import { formatDate, formatDuration, formatMiles, roleLabel } from '../../../../lib/format';
+import {
+  formatDate,
+  formatDuration,
+  formatMiles,
+  formatPace,
+  formatSplits,
+  roleLabel,
+} from '../../../../lib/format';
 import { isSupabaseConfigured, supabase } from '../../../../lib/supabase';
 import { PROFILE_COLUMNS,
   WORKOUT_LOG_COLUMNS,
@@ -268,10 +275,17 @@ export default function AthleteDetail() {
               {log.effort ? <Badge label={`Effort ${log.effort}/10`} tone="neutral" /> : null}
             </View>
             <Text style={styles.logStats}>
-              {[formatMiles(log.distance_miles), formatDuration(log.duration_seconds)]
+              {[
+                formatMiles(log.distance_miles),
+                formatDuration(log.duration_seconds),
+                formatPace(log.distance_miles, log.duration_seconds),
+              ]
                 .filter(Boolean)
                 .join(' · ') || 'Marked done'}
             </Text>
+            {formatSplits(log.split_seconds) ? (
+              <Text style={styles.logSplits}>Splits: {formatSplits(log.split_seconds)}</Text>
+            ) : null}
             {log.notes ? <Text style={styles.logNotes}>{log.notes}</Text> : null}
             {log.logged_by && log.logged_by !== athlete.id ? (
               <Text style={styles.logBy}>
@@ -316,6 +330,7 @@ const makeStyles = (c: Palette) =>
   logHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   logDate: { ...type.bodyStrong, color: c.text },
   logStats: { ...type.body, color: c.primary, marginTop: spacing.xs },
+  logSplits: { ...type.caption, color: c.text, marginTop: spacing.xs },
   logNotes: { ...type.body, color: c.textMuted, marginTop: spacing.xs },
   logBy: { ...type.caption, color: c.textFaint, marginTop: spacing.sm, fontStyle: 'italic' },
   remove: { marginTop: spacing.xxl, gap: spacing.sm },

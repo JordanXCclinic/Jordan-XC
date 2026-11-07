@@ -2,7 +2,10 @@ import {
   formatDuration,
   formatMileRange,
   formatMiles,
+  formatPace,
   formatShortDate,
+  formatSplits,
+  splitsLabel,
   parseDuration,
   parseLocalDateTime,
   planDayLabel,
@@ -140,5 +143,38 @@ describe('formatMileRange', () => {
   it('shows nothing when only the far end is set', () => {
     // Half a range is not a distance, so it is not rendered as one.
     expect(formatMileRange(null, 6)).toBeNull();
+  });
+});
+
+describe('formatPace', () => {
+  it('divides time by distance into minutes per mile', () => {
+    expect(formatPace(5, 37 * 60 + 40)).toBe('7:32 /mi');
+    expect(formatPace(3.1, 18 * 60 + 23)).toBe('5:56 /mi');
+    expect(formatPace('6.20', 2700)).toBe('7:15 /mi');
+  });
+
+  it('says nothing without both a distance and a time', () => {
+    expect(formatPace(null, 1800)).toBeNull();
+    expect(formatPace(4, null)).toBeNull();
+    expect(formatPace(0, 1800)).toBeNull();
+  });
+
+  it('treats an hour a mile or slower as a typo, not a pace', () => {
+    expect(formatPace(0.1, 1800)).toBeNull();
+  });
+});
+
+describe('formatSplits', () => {
+  it('lists rep times in order', () => {
+    expect(formatSplits([165, 164, 166])).toBe('2:45 · 2:44 · 2:46');
+    expect(formatSplits([])).toBeNull();
+    expect(formatSplits(null)).toBeNull();
+  });
+});
+
+describe('splitsLabel', () => {
+  it('names the reps when the coach said what they are', () => {
+    expect(splitsLabel({ split_count: 6, split_label: '800m' })).toBe('6 × 800m splits');
+    expect(splitsLabel({ split_count: 4, split_label: null })).toBe('4 splits');
   });
 });

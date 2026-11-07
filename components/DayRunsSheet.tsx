@@ -9,6 +9,8 @@ import {
   formatDayHeading,
   formatDuration,
   formatMiles,
+  formatPace,
+  formatSplits,
   milesNumber,
   parseLocalDateTime,
 } from '../lib/format';
@@ -16,16 +18,26 @@ import { round2 } from '../lib/mileage';
 import { supabase } from '../lib/supabase';
 import { radius, spacing, type, type Palette } from '../lib/theme';
 
-type LogRow = Omit<WorkoutLogEntry, 'workout_title'> & {
+type EmbeddedWorkout = { title: string; split_count: number | null; split_label: string | null };
+
+type LogRow = Omit<
+  WorkoutLogEntry,
+  'workout_title' | 'workout_split_count' | 'workout_split_label'
+> & {
   // A many-to-one embed, which PostgREST returns as an object; read an array
   // too rather than trust the inference.
-  workouts: { title: string } | { title: string }[] | null;
+  workouts: EmbeddedWorkout | EmbeddedWorkout[] | null;
 };
 
 function toEntry(row: LogRow): WorkoutLogEntry {
   const { workouts, ...rest } = row;
   const workout = Array.isArray(workouts) ? workouts[0] : workouts;
-  return { ...rest, workout_title: workout?.title ?? null };
+  return {
+    ...rest,
+    workout_title: workout?.title ?? null,
+    workout_split_count: workout?.split_count ?? null,
+    workout_split_label: workout?.split_label ?? null,
+  };
 }
 
 /**
@@ -61,7 +73,8 @@ export function DayRunsSheet({
     const { data, error: loadError } = await supabase
       .from('workout_logs')
       .select(
-        'id, workout_id, logged_on, distance_miles, duration_seconds, effort, notes, workouts(title)'
+        'id, workout_id, logged_on, distance_miles, duration_seconds, effort, notes, split_seconds, '
+          + 'workouts(title, split_count, split_label)'
       )
       .eq('athlete_id', athleteId)
       .eq('logged_on', day)
@@ -103,6 +116,8 @@ export function DayRunsSheet({
           athleteId={athleteId}
           workoutId={editing.workout_id}
           workoutTitle={editing.workout_title}
+          splitCount={editing.workout_split_count}
+          splitLabel={editing.workout_split_label}
           entry={editing}
           onCancel={() => setEditing(null)}
           onSaved={changed}
@@ -153,8 +168,10 @@ function RunRow({ run, onPress }: { run: WorkoutLogEntry; onPress?: () => void }
   const facts = [
     miles,
     formatDuration(run.duration_seconds),
+    formatPace(run.distance_miles, run.duration_seconds),
     run.effort ? `Effort ${run.effort}/10` : null,
   ].filter((fact): fact is string => Boolean(fact));
+  const splits = formatSplits(run.split_seconds);
   const title = run.workout_title ?? 'Run';
 
   const body = (
@@ -162,6 +179,7 @@ function RunRow({ run, onPress }: { run: WorkoutLogEntry; onPress?: () => void }
       <View style={styles.rowText}>
         <Text style={styles.rowTitle}>{title}</Text>
         <Text style={styles.rowFacts}>{facts.length ? facts.join(' · ') : 'Marked done'}</Text>
+        {splits ? <Text style={styles.rowSplits}>Splits: {splits}</Text> : null}
         {run.notes ? <Text style={styles.rowNotes}>{run.notes}</Text> : null}
       </View>
       {onPress ? (
@@ -210,6 +228,7 @@ const makeStyles = (c: Palette) =>
     rowText: { flex: 1, gap: 2 },
     rowTitle: { ...type.bodyStrong, color: c.text },
     rowFacts: { ...type.body, color: c.textMuted },
+    rowSplits: { ...type.caption, color: c.text, marginTop: spacing.xs },
     rowNotes: { ...type.caption, color: c.textMuted, marginTop: spacing.xs },
     edit: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, paddingTop: 2 },
     editText: { ...type.label, color: c.primary },

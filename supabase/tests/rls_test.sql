@@ -1680,3 +1680,60 @@ begin
 end $$;
 
 reset role;
+
+-- Splits (0026): a coach sets reps on a workout; a runner logs rep times in
+-- seconds, all present and positive.
+reset role;
+insert into workouts (id, plan_id, week_number, day_of_week, title, split_count, split_label)
+values ('d6000000-0000-0000-0000-000000000001', 'd4000000-0000-0000-0000-000000000001',
+        1, 2, '6 x 800m', 6, '800m');
+
+set role authenticated;
+select set_config('request.jwt.claim.sub', 'd3000000-0000-0000-0000-000000000002', false);
+do $$
+begin
+  insert into workout_logs (athlete_id, workout_id, logged_on, distance_miles, duration_seconds, split_seconds)
+  values ('d3000000-0000-0000-0000-000000000002', 'd6000000-0000-0000-0000-000000000001',
+          current_date, 5, 2400, array[165, 164, 166, 163, 162, 160]);
+  raise notice 'PASS: a runner logs their splits';
+exception when others then
+  raise notice 'FAIL: a runner could not log splits (%)', sqlerrm;
+end $$;
+
+do $$
+begin
+  insert into workout_logs (athlete_id, workout_id, logged_on, split_seconds)
+  values ('d3000000-0000-0000-0000-000000000002', 'd6000000-0000-0000-0000-000000000001',
+          current_date, array[165, null, 166]);
+  raise notice 'FAIL: a split with a gap in it was saved';
+exception when others then
+  raise notice 'PASS: splits cannot have gaps (%)', sqlerrm;
+end $$;
+
+do $$
+begin
+  insert into workout_logs (athlete_id, workout_id, logged_on, split_seconds)
+  values ('d3000000-0000-0000-0000-000000000002', 'd6000000-0000-0000-0000-000000000001',
+          current_date, array[165, 0]);
+  raise notice 'FAIL: a split of no time was saved';
+exception when others then
+  raise notice 'PASS: every split is a positive time (%)', sqlerrm;
+end $$;
+
+do $$
+begin
+  update workouts set split_count = 3 where id = 'd6000000-0000-0000-0000-000000000001';
+  if (select split_count from workouts where id = 'd6000000-0000-0000-0000-000000000001') = 6
+  then raise notice 'PASS: a runner cannot change a workout''s splits';
+  else raise notice 'FAIL: a runner changed a workout''s splits';
+  end if;
+end $$;
+
+reset role;
+do $$
+begin
+  update workouts set split_count = 31 where id = 'd6000000-0000-0000-0000-000000000001';
+  raise notice 'FAIL: a workout was given 31 splits';
+exception when others then
+  raise notice 'PASS: a workout has at most 30 splits (%)', sqlerrm;
+end $$;

@@ -123,11 +123,15 @@ export type Workout = {
   /** Far end of a planned range. Null when the distance is a single number. */
   distance_miles_max: number | null;
   intensity: string | null;
+  /** How many rep times a runner enters when logging it. Null: no splits. */
+  split_count: number | null;
+  /** What each rep is, like "800m". */
+  split_label: string | null;
 };
 
 export const WORKOUT_COLUMNS =
   'id, plan_id, week_number, day_of_week, title, description, distance_miles, '
-  + 'distance_miles_max, intensity';
+  + 'distance_miles_max, intensity, split_count, split_label';
 
 export type MeetingSlot = {
   id: string;
@@ -181,10 +185,13 @@ export type WorkoutLog = {
   notes: string | null;
   /** Differs from athlete_id when a parent entered the run for their athlete. */
   logged_by: string | null;
+  /** Each rep's time in seconds, in order, for a workout with splits. */
+  split_seconds: number[] | null;
 };
 
 export const WORKOUT_LOG_COLUMNS =
-  'id, athlete_id, workout_id, logged_on, distance_miles, duration_seconds, effort, notes, logged_by';
+  'id, athlete_id, workout_id, logged_on, distance_miles, duration_seconds, effort, notes, '
+  + 'logged_by, split_seconds';
 
 export const isCoach = (role: AppRole | undefined): boolean =>
   role === 'admin' || role === 'coach';

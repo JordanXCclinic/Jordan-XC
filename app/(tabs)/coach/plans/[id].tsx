@@ -13,12 +13,18 @@ import { Animated,
 import { Badge } from '../../../../components/Badge';
 import { Button } from '../../../../components/Button';
 import { Card } from '../../../../components/Card';
-import { ChipSelect, TextField } from '../../../../components/Field';
+import { ChipSelect, SwitchRow, TextField } from '../../../../components/Field';
 import { DateTimeField } from '../../../../components/DateTimeField';
 import { EmptyState, LoadingState, Screen, SectionHeader } from '../../../../components/Screen';
 import { useAuth } from '../../../../lib/auth';
 import { confirmDestructive } from '../../../../lib/confirm';
-import { PLAN_DAYS, formatMileRange, planDayLabel, toDateInput } from '../../../../lib/format';
+import {
+  PLAN_DAYS,
+  formatMileRange,
+  planDayLabel,
+  splitsLabel,
+  toDateInput,
+} from '../../../../lib/format';
 import { isSupabaseConfigured, supabase } from '../../../../lib/supabase';
 import { AUDIENCE_LABELS,
   PROFILE_COLUMNS,
@@ -95,6 +101,10 @@ export default function PlanEditor() {
   const [distance, setDistance] = useState('');
   const [distanceMax, setDistanceMax] = useState('');
   const [intensity, setIntensity] = useState('');
+  /** Interval sessions: runners enter each rep's time when they log it. */
+  const [splitsOn, setSplitsOn] = useState(false);
+  const [splitCount, setSplitCount] = useState('');
+  const [splitLabel, setSplitLabel] = useState('');
   const [description, setDescription] = useState('');
   const [startsOn, setStartsOn] = useState(nextMonday);
   const [saving, setSaving] = useState(false);
@@ -208,6 +218,9 @@ export default function PlanEditor() {
     setDistance('');
     setDistanceMax('');
     setIntensity('');
+    setSplitsOn(false);
+    setSplitCount('');
+    setSplitLabel('');
     setDescription('');
     setError(null);
   }
@@ -223,6 +236,9 @@ export default function PlanEditor() {
       workout.distance_miles_max === null ? '' : String(workout.distance_miles_max)
     );
     setIntensity(workout.intensity ?? '');
+    setSplitsOn(workout.split_count !== null);
+    setSplitCount(workout.split_count === null ? '' : String(workout.split_count));
+    setSplitLabel(workout.split_label ?? '');
     setDescription(workout.description ?? '');
     setError(null);
   }
@@ -263,6 +279,12 @@ export default function PlanEditor() {
       ? milesMaxRaw
       : null;
 
+    const reps = splitsOn ? Number(splitCount.trim()) : null;
+    if (reps !== null && (!Number.isInteger(reps) || reps < 1 || reps > 30)) {
+      setError('Splits need a number of reps from 1 to 30, like 6.');
+      return;
+    }
+
     setSaving(true);
     setError(null);
 
@@ -278,6 +300,8 @@ export default function PlanEditor() {
         distance_miles: miles,
         distance_miles_max: milesMax,
         intensity: intensity.trim() || null,
+        split_count: reps,
+        split_label: reps !== null ? splitLabel.trim() || null : null,
       },
       { onConflict: 'plan_id,week_number,day_of_week' }
     );
@@ -615,6 +639,36 @@ export default function PlanEditor() {
             onChangeText={setIntensity}
             placeholder="Hard"
           />
+          <SwitchRow
+            label="Runners enter splits"
+            hint="For intervals: each runner types in every rep's time when they log it."
+            value={splitsOn}
+            onValueChange={setSplitsOn}
+          />
+          {splitsOn ? (
+            <View style={styles.row}>
+              <View style={styles.half}>
+                <TextField
+                  label="Reps"
+                  value={splitCount}
+                  onChangeText={setSplitCount}
+                  placeholder="6"
+                  keyboardType="number-pad"
+                  required
+                  maxLength={2}
+                />
+              </View>
+              <View style={styles.half}>
+                <TextField
+                  label="Each rep"
+                  value={splitLabel}
+                  onChangeText={setSplitLabel}
+                  placeholder="800m"
+                  maxLength={40}
+                />
+              </View>
+            </View>
+          ) : null}
           <TextField
             label="Details"
             value={description}
@@ -671,6 +725,7 @@ export default function PlanEditor() {
                 />
               ) : null}
               {workout.intensity ? <Badge label={workout.intensity} /> : null}
+              {workout.split_count ? <Badge label={splitsLabel(workout)} /> : null}
             </View>
             {workout.description ? <Text style={styles.body}>{workout.description}</Text> : null}
 

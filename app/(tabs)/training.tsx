@@ -15,6 +15,7 @@ import { firstName,
   isSameDay,
   parseLocalDateTime,
   planDayLabel,
+  splitsLabel,
 } from '../../lib/format';
 import { isSupabaseConfigured, supabase } from '../../lib/supabase';
 import { currentWeekNumber, planPositionToday, workoutDate } from '../../lib/training';
@@ -256,6 +257,7 @@ export default function Training() {
                       />
                     ) : null}
                     {workout.intensity ? <Badge label={workout.intensity} /> : null}
+                    {workout.split_count ? <Badge label={splitsLabel(workout)} /> : null}
                   </View>
 
                   {workout.description ? (

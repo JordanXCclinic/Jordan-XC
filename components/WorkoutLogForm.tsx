@@ -6,6 +6,7 @@ import { ChipSelect, TextField } from './Field';
 import {
   PLAN_DAYS,
   formatDuration,
+  formatPace,
   isSameDay,
   localDateKey,
   milesNumber,
@@ -32,6 +33,11 @@ export type WorkoutLogEntry = {
   duration_seconds: number | null;
   effort: number | null;
   notes: string | null;
+  /** Each rep's time in seconds, for a workout with splits. */
+  split_seconds: number[] | null;
+  /** The workout's own splits setting, so the boxes come back when editing. */
+  workout_split_count: number | null;
+  workout_split_label: string | null;
 };
 
 function dayLabel(day: Date, today: Date): string {
@@ -78,6 +84,8 @@ export function WorkoutLogForm({
   athleteId,
   workoutId,
   workoutTitle,
+  splitCount = null,
+  splitLabel = null,
   entry,
   onCancel,
   onSaved,
@@ -86,6 +94,10 @@ export function WorkoutLogForm({
   athleteId: string;
   workoutId: string | null;
   workoutTitle: string | null;
+  /** Set when the coach wants each rep's time for this workout. */
+  splitCount?: number | null;
+  /** What each rep is, like "800m". */
+  splitLabel?: string | null;
   /** A run to change. Without one, the form logs a new run. */
   entry?: WorkoutLogEntry;
   onCancel: () => void;
@@ -96,6 +108,7 @@ export function WorkoutLogForm({
   const styles = useThemedStyles(makeStyles);
 
   const days = dayOptions(entry?.logged_on ?? null);
+
   const [day, setDay] = useState(entry?.logged_on ?? days[0]!.value);
   const [distance, setDistance] = useState(
     entry?.distance_miles != null ? milesNumber(Number(entry.distance_miles)) : ''
@@ -103,10 +116,23 @@ export function WorkoutLogForm({
   const [duration, setDuration] = useState(formatDuration(entry?.duration_seconds ?? null) ?? '');
   const [effort, setEffort] = useState<number | null>(entry?.effort ?? null);
   const [notes, setNotes] = useState(entry?.notes ?? '');
+  // One box per rep. A log saved before the coach changed the rep count keeps
+  // every time it already has.
+  const [splits, setSplits] = useState<string[]>(() =>
+    Array.from({ length: Math.max(splitCount ?? 0, entry?.split_seconds?.length ?? 0) }, (_, rep) =>
+      formatDuration(entry?.split_seconds?.[rep] ?? null) ?? ''
+    )
+  );
   const [saving, setSaving] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Filled in as they type: distance over time, worked out for them.
+  const pace = formatPace(
+    distance.trim() ? Number(distance.trim()) : null,
+    duration.trim() ? parseDuration(duration) : null
+  );
 
   async function save() {
     const miles = distance.trim() ? Number(distance.trim()) : null;
@@ -125,6 +151,24 @@ export function WorkoutLogForm({
       return;
     }
 
+    // Reps are filled from the first one; blank boxes at the end are reps not
+    // run, but a gap in the middle would put every later time on the wrong rep.
+    const typed = splits.map((split) => split.trim());
+    const lastFilled = typed.reduce((last, split, rep) => (split ? rep : last), -1);
+    const splitSeconds: number[] = [];
+    for (let rep = 0; rep <= lastFilled; rep += 1) {
+      if (!typed[rep]) {
+        setError(`Fill in rep ${rep + 1}, or leave every rep after it blank.`);
+        return;
+      }
+      const seconds = parseDuration(typed[rep]!);
+      if (seconds === null) {
+        setError(`Rep ${rep + 1} should look like 2:45.`);
+        return;
+      }
+      splitSeconds.push(seconds);
+    }
+
     setSaving(true);
     setError(null);
 
@@ -134,6 +178,7 @@ export function WorkoutLogForm({
       duration_seconds: seconds,
       effort,
       notes: notes.trim() || null,
+      split_seconds: splitSeconds.length > 0 ? splitSeconds : null,
     };
     const { error: saveError } = entry
       ? await supabase.from('workout_logs').update(values).eq('id', entry.id)
@@ -186,6 +231,39 @@ export function WorkoutLogForm({
         placeholder="42:30"
         keyboardType="numbers-and-punctuation"
       />
+
+      {pace ? (
+        <View style={styles.pace} accessibilityLiveRegion="polite">
+          <Ionicons name="speedometer-outline" size={18} color={c.primary} />
+          <Text style={styles.paceText}>
+            Pace <Text style={styles.paceValue}>{pace}</Text>
+          </Text>
+        </View>
+      ) : null}
+
+      {splits.length > 0 ? (
+        <View style={styles.splitsBlock}>
+          <Text style={styles.label}>
+            Splits{splitLabel ? ` · ${splits.length} × ${splitLabel}` : ''}
+          </Text>
+          <Text style={styles.hint}>Each rep’s time, like 2:45. Leave the end blank for reps you didn’t run.</Text>
+          <View style={styles.splits}>
+            {splits.map((split, rep) => (
+              <View key={rep} style={styles.split}>
+                <TextField
+                  label={`Rep ${rep + 1}`}
+                  value={split}
+                  onChangeText={(next) =>
+                    setSplits((current) => current.map((value, index) => (index === rep ? next : value)))
+                  }
+                  placeholder="2:45"
+                  keyboardType="numbers-and-punctuation"
+                />
+              </View>
+            ))}
+          </View>
+        </View>
+      ) : null}
 
       <View style={styles.effortBlock}>
         <Text style={styles.label}>How hard did it feel?</Text>
@@ -305,4 +383,18 @@ const makeStyles = (c: Palette) =>
       backgroundColor: c.dangerTint,
     },
     confirmText: { ...type.body, color: c.text },
+    pace: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.sm,
+      padding: spacing.md,
+      borderRadius: radius.md,
+      backgroundColor: c.primaryTint,
+      marginTop: -spacing.sm,
+    },
+    paceText: { ...type.body, color: c.text },
+    paceValue: { ...type.bodyStrong, color: c.primary },
+    splitsBlock: { gap: spacing.sm },
+    splits: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md },
+    split: { width: '30%', minWidth: 90 },
   });
