@@ -94,3 +94,20 @@ export function planWeekOf(startsOn: string, date: Date): number | null {
   const week = Math.floor(daysBetween(monday, mondayOf(date)) / 7) + 1;
   return week >= 1 ? week : null;
 }
+
+/**
+ * The Mondays of every week row a month calendar shows, Monday-first, from the
+ * week holding the 1st to the week holding the last day. Four to six rows.
+ */
+export function monthWeeks(month: Date): Date[] {
+  const first = new Date(month.getFullYear(), month.getMonth(), 1);
+  const last = new Date(month.getFullYear(), month.getMonth() + 1, 0);
+  const rows: Date[] = [];
+  // setDate rather than adding milliseconds, so a clock change cannot move it.
+  for (let monday = mondayOf(first); monday <= last; ) {
+    rows.push(monday);
+    monday = new Date(monday);
+    monday.setDate(monday.getDate() + 7);
+  }
+  return rows;
+}

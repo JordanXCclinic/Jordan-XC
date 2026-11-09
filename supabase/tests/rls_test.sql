@@ -1758,3 +1758,36 @@ begin
 exception when others then
   raise notice 'PASS: a ladder names every rep, no more and no fewer (%)', sqlerrm;
 end $$;
+
+-- Plan start date (0028): a coach sets the week 1 Monday on the plan and moves
+-- everyone on it; a runner can do neither.
+reset role;
+set role authenticated;
+select set_config('request.jwt.claim.sub', 'd3000000-0000-0000-0000-000000000001', false);
+update training_plans set starts_on = '2026-11-16' where id = 'd4000000-0000-0000-0000-000000000001';
+update plan_assignments set starts_on = '2026-11-16' where plan_id = 'd4000000-0000-0000-0000-000000000001';
+do $$
+begin
+  if (select starts_on from training_plans where id = 'd4000000-0000-0000-0000-000000000001') = '2026-11-16'
+     and not exists (select 1 from plan_assignments
+                      where plan_id = 'd4000000-0000-0000-0000-000000000001'
+                        and starts_on <> '2026-11-16')
+  then raise notice 'PASS: a coach sets a plan''s start and moves everyone on it';
+  else raise notice 'FAIL: a coach could not set a plan''s start';
+  end if;
+end $$;
+
+select set_config('request.jwt.claim.sub', 'd3000000-0000-0000-0000-000000000002', false);
+update training_plans set starts_on = '2027-01-04' where id = 'd4000000-0000-0000-0000-000000000001';
+update plan_assignments set starts_on = '2027-01-04' where plan_id = 'd4000000-0000-0000-0000-000000000001';
+reset role;
+do $$
+begin
+  if (select starts_on from training_plans where id = 'd4000000-0000-0000-0000-000000000001') = '2026-11-16'
+     and not exists (select 1 from plan_assignments
+                      where plan_id = 'd4000000-0000-0000-0000-000000000001'
+                        and starts_on <> '2026-11-16')
+  then raise notice 'PASS: a runner cannot move a plan''s start';
+  else raise notice 'FAIL: a runner moved a plan''s start';
+  end if;
+end $$;

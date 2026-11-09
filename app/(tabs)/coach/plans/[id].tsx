@@ -14,18 +14,20 @@ import { Badge } from '../../../../components/Badge';
 import { Button } from '../../../../components/Button';
 import { Card } from '../../../../components/Card';
 import { ChipSelect, SwitchRow, TextField } from '../../../../components/Field';
-import { DateTimeField } from '../../../../components/DateTimeField';
+import { WeekCalendar } from '../../../../components/WeekCalendar';
 import { EmptyState, LoadingState, Screen, SectionHeader } from '../../../../components/Screen';
 import { useAuth } from '../../../../lib/auth';
 import { confirmDestructive } from '../../../../lib/confirm';
 import {
   PLAN_DAYS,
   formatMileRange,
+  formatShortDate,
   parseLadder,
   planDayLabel,
   splitsLabel,
   toDateInput,
 } from '../../../../lib/format';
+import { planWeekOf, workoutDate } from '../../../../lib/training';
 
 const SPLIT_KINDS = [
   { value: 'same', label: 'All the same' },
@@ -44,22 +46,24 @@ import { AUDIENCE_LABELS,
 import { radius, spacing, type, type Palette } from '../../../../lib/theme';
 import { useTheme, useThemedStyles } from '../../../../lib/appearance';
 
-const DAY_OPTIONS = PLAN_DAYS.map((label, index) => ({ value: String(index + 1), label }));
+/** The plan, with the day its week 1 begins (0028), or null before one is picked. */
+type EditablePlan = TrainingPlan & { starts_on: string | null };
+
+/** "Nov 16 – 22", or "Nov 30 – Dec 6" when the week crosses a month. */
+function weekRange(startsOn: string, week: number): string {
+  const monday = workoutDate(startsOn, week, 1);
+  const sunday = workoutDate(startsOn, week, 7);
+  if (!monday || !sunday) return '';
+  return monday.getMonth() === sunday.getMonth()
+    ? `${formatShortDate(monday)} – ${sunday.getDate()}`
+    : `${formatShortDate(monday)} – ${formatShortDate(sunday)}`;
+}
 
 const AUDIENCES: { value: Audience; label: string }[] = [
   { value: 'clinic', label: AUDIENCE_LABELS.clinic },
   { value: 'private', label: AUDIENCE_LABELS.private },
   { value: 'everyone', label: AUDIENCE_LABELS.everyone },
 ];
-
-/** Plans usually start on a Monday, so that is what the date field offers. */
-function nextMonday(): Date {
-  const date = new Date();
-  const ahead = (8 - (date.getDay() || 7)) % 7 || 7;
-  date.setDate(date.getDate() + ahead);
-  date.setHours(0, 0, 0, 0);
-  return date;
-}
 
 type LoggedBy = {
   name: string;
@@ -77,12 +81,18 @@ export default function PlanEditor() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { profile } = useAuth();
 
-  const [plan, setPlan] = useState<TrainingPlan | null>(null);
+  const [plan, setPlan] = useState<EditablePlan | null>(null);
   const [workouts, setWorkouts] = useState<Workout[]>([]);
   const [athletes, setAthletes] = useState<Profile[]>([]);
   const [assigned, setAssigned] = useState<Set<string>>(new Set());
   /** Each assigned runner's pace group on this plan, 1 to 5, or null for none. */
   const [groups, setGroups] = useState<Record<string, number | null>>({});
+  /** Each assigned runner's start date, to spot anyone out of step with the plan. */
+  const [starts, setStarts] = useState<Record<string, string>>({});
+  /** Choosing which calendar week becomes week 1. */
+  const [picking, setPicking] = useState(false);
+  const [startSaving, setStartSaving] = useState(false);
+  const [startError, setStartError] = useState<string | null>(null);
   const [assignError, setAssignError] = useState<string | null>(null);
   const [assigningAll, setAssigningAll] = useState(false);
   // Swapping the whole screen for a spinner on every refresh rebuilt the page
@@ -115,7 +125,6 @@ export default function PlanEditor() {
   const [splitKind, setSplitKind] = useState<'same' | 'ladder'>('same');
   const [ladder, setLadder] = useState('');
   const [description, setDescription] = useState('');
-  const [startsOn, setStartsOn] = useState(nextMonday);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -128,7 +137,11 @@ export default function PlanEditor() {
 
     const [{ data: planRow }, { data: workoutRows }, { data: athleteRows }, { data: assignRows }] =
       await Promise.all([
-        supabase.from('training_plans').select(TRAINING_PLAN_COLUMNS).eq('id', id).maybeSingle(),
+        supabase
+          .from('training_plans')
+          .select(`${TRAINING_PLAN_COLUMNS}, starts_on`)
+          .eq('id', id)
+          .maybeSingle(),
         supabase
           .from('workouts')
           .select(WORKOUT_COLUMNS)
@@ -140,16 +153,27 @@ export default function PlanEditor() {
           .select(PROFILE_COLUMNS)
           .in('role', ['athlete', 'private_client'])
           .order('full_name'),
-        supabase.from('plan_assignments').select('athlete_id, pace_group').eq('plan_id', id),
+        supabase
+          .from('plan_assignments')
+          .select('athlete_id, pace_group, starts_on')
+          .eq('plan_id', id),
       ]);
 
-    setPlan((planRow as TrainingPlan | null) ?? null);
+    const loadedPlan = (planRow as EditablePlan | null) ?? null;
+    setPlan(loadedPlan);
+    // Open on this week of the plan, not week 1, once it is under way.
+    if (!loadedOnce.current && loadedPlan?.starts_on) {
+      setWeek(Math.max(1, planWeekOf(loadedPlan.starts_on, new Date()) ?? 1));
+    }
     setWorkouts((workoutRows as Workout[] | null) ?? []);
     setAthletes((athleteRows as Profile[] | null) ?? []);
     const assignments =
-      (assignRows as { athlete_id: string; pace_group: number | null }[] | null) ?? [];
+      (assignRows as
+        | { athlete_id: string; pace_group: number | null; starts_on: string }[]
+        | null) ?? [];
     setAssigned(new Set(assignments.map((row) => row.athlete_id)));
     setGroups(Object.fromEntries(assignments.map((row) => [row.athlete_id, row.pace_group])));
+    setStarts(Object.fromEntries(assignments.map((row) => [row.athlete_id, row.starts_on])));
 
     // Who has done which session. One query for the plan rather than one per
     // workout, then matched up in memory.
@@ -209,12 +233,77 @@ export default function PlanEditor() {
     void load();
   }, [load]);
 
-  // Always offer one week past what exists, so a plan can grow a week at a time.
+  const writtenWeeks = useMemo(
+    () => new Set(workouts.map((workout) => workout.week_number)),
+    [workouts]
+  );
+
+  // Always offer one week past what exists, so a plan can grow a week at a time,
+  // and the week picked on the calendar even if it skips ahead.
   const weeks = useMemo(() => {
-    const written = [...new Set(workouts.map((workout) => workout.week_number))];
-    const highest = written.length > 0 ? Math.max(...written) : 0;
-    return Array.from({ length: Math.max(highest + 1, 1) }, (_, index) => index + 1);
-  }, [workouts]);
+    const highest = writtenWeeks.size > 0 ? Math.max(...writtenWeeks) : 0;
+    return Array.from({ length: Math.max(highest + 1, week, 1) }, (_, index) => index + 1);
+  }, [writtenWeeks, week]);
+
+  const startsOn = plan?.starts_on ?? null;
+  // With no start yet, the calendar can only be used to pick one.
+  const choosingStart = picking || !startsOn;
+
+  const dayOptions = useMemo(
+    () =>
+      PLAN_DAYS.map((label, index) => {
+        const date = startsOn ? workoutDate(startsOn, week, index + 1) : null;
+        return { value: String(index + 1), label: date ? `${label} ${date.getDate()}` : label };
+      }),
+    [startsOn, week]
+  );
+
+  /** A different week to write. Leaves any half-made edit behind rather than moving it. */
+  function chooseWeek(next: number) {
+    if (next === week) return;
+    if (editingId) resetForm();
+    setWeek(next);
+  }
+
+  /**
+   * Week 1 begins on this Monday, for the plan and everyone on it. One date for
+   * the whole group, so week 3 is the same week for every runner.
+   */
+  async function saveStart(monday: Date) {
+    if (!id || !plan) return;
+    const value = toDateInput(monday);
+    setStartSaving(true);
+    setStartError(null);
+
+    const { error: planWriteError } = await supabase
+      .from('training_plans')
+      .update({ starts_on: value })
+      .eq('id', id);
+    const { error: assignWriteError } = planWriteError
+      ? { error: null }
+      : await supabase.from('plan_assignments').update({ starts_on: value }).eq('plan_id', id);
+
+    setStartSaving(false);
+    const writeError = planWriteError ?? assignWriteError;
+    if (writeError) {
+      setStartError(`The start date was not changed — ${writeError.message}`);
+      if (!planWriteError) setPlan({ ...plan, starts_on: value });
+      return;
+    }
+
+    setPlan({ ...plan, starts_on: value });
+    setStarts((current) => Object.fromEntries(Object.keys(current).map((key) => [key, value])));
+    setPicking(false);
+  }
+
+  function pickWeek(monday: Date) {
+    if (choosingStart) {
+      void saveStart(monday);
+      return;
+    }
+    const picked = startsOn ? planWeekOf(startsOn, monday) : null;
+    if (picked !== null) chooseWeek(picked);
+  }
 
   const shown = useMemo(
     () => workouts.filter((workout) => workout.week_number === week),
@@ -428,8 +517,16 @@ export default function PlanEditor() {
   );
   const unassigned = eligible.filter((athlete) => !assigned.has(athlete.id));
 
+  const outOfStep = startsOn
+    ? [...assigned].filter((athleteId) => starts[athleteId] && starts[athleteId] !== startsOn).length
+    : 0;
+
   async function assignAll() {
     if (!id || !profile || unassigned.length === 0) return;
+    if (!startsOn) {
+      setAssignError('Pick the week training starts on the calendar at the top first.');
+      return;
+    }
 
     // Only the ones not on it yet. Anyone already assigned keeps the start date
     // they were given, rather than being moved to whatever the picker says now.
@@ -443,7 +540,7 @@ export default function PlanEditor() {
       adding.map((athlete) => ({
         plan_id: id,
         athlete_id: athlete.id,
-        starts_on: toDateInput(startsOn),
+        starts_on: startsOn,
         assigned_by: profile.id,
       })),
       { onConflict: 'plan_id,athlete_id' }
@@ -454,11 +551,20 @@ export default function PlanEditor() {
       // One request, so it either all went in or none of it did.
       setAssigned(before);
       setAssignError(`Nobody was assigned — ${writeError.message}`);
+      return;
     }
+    setStarts((current) => ({
+      ...current,
+      ...Object.fromEntries(adding.map((athlete) => [athlete.id, startsOn])),
+    }));
   }
 
   async function toggleAssignment(athlete: Profile, next: boolean) {
     if (!id || !profile) return;
+    if (next && !startsOn) {
+      setAssignError('Pick the week training starts on the calendar at the top first.');
+      return;
+    }
 
     // Flip the switch here and leave the rest of the page alone. Reloading
     // everything meant a coach assigning a squad was thrown back to the top of
@@ -481,7 +587,7 @@ export default function PlanEditor() {
           {
             plan_id: id,
             athlete_id: athlete.id,
-            starts_on: toDateInput(startsOn),
+            starts_on: startsOn,
             assigned_by: profile.id,
           },
           { onConflict: 'plan_id,athlete_id' }
@@ -497,7 +603,9 @@ export default function PlanEditor() {
       // training they were never given.
       flip(!next);
       setAssignError(`${athlete.full_name} could not be changed — ${writeError.message}`);
+      return;
     }
+    if (next && startsOn) setStarts((current) => ({ ...current, [athlete.id]: startsOn }));
   }
 
   // The coach's paces live in a notebook at practice; the app only records which
@@ -602,22 +710,68 @@ export default function PlanEditor() {
         </View>
       )}
 
+      <Card>
+        <View style={styles.head}>
+          <Text style={styles.cardTitle}>Training calendar</Text>
+          {startsOn ? (
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => {
+                setStartError(null);
+                setPicking((on) => !on);
+              }}
+              hitSlop={8}
+              style={({ pressed }) => [styles.editHint, pressed && styles.pressed]}
+            >
+              <Ionicons
+                name={picking ? 'close' : 'calendar-outline'}
+                size={15}
+                color={c.primary}
+              />
+              <Text style={styles.editHintText}>{picking ? 'Cancel' : 'Change start'}</Text>
+            </Pressable>
+          ) : null}
+        </View>
+        <Text style={[styles.calendarHint, choosingStart && styles.calendarHintPicking]}>
+          {startSaving
+            ? 'Saving…'
+            : choosingStart
+              ? startsOn
+                ? 'Tap the week that should be week 1. Everyone on this plan moves with it.'
+                : 'Tap the week training starts. That week becomes week 1.'
+              : `Week 1 is ${weekRange(startsOn!, 1)}. Tap any week, past or ahead, to write or change its training.`}
+        </Text>
+        <WeekCalendar
+          startsOn={startsOn}
+          selectedWeek={week}
+          writtenWeeks={writtenWeeks}
+          picking={choosingStart}
+          onPickWeek={pickWeek}
+        />
+        {startError ? <Text style={styles.error}>{startError}</Text> : null}
+      </Card>
+
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.weeks}>
         {weeks.map((number) => {
           const selected = number === week;
-          const empty = !workouts.some((workout) => workout.week_number === number);
+          const empty = !writtenWeeks.has(number);
           return (
             <Pressable
               key={number}
               accessibilityRole="tab"
               accessibilityState={{ selected }}
-              onPress={() => setWeek(number)}
+              onPress={() => chooseWeek(number)}
               style={[styles.weekChip, selected && styles.weekChipSelected]}
             >
               <Text style={[styles.weekText, selected && styles.weekTextSelected]}>
                 Week {number}
                 {empty ? ' +' : ''}
               </Text>
+              {startsOn ? (
+                <Text style={[styles.weekDates, selected && styles.weekTextSelected]}>
+                  {weekRange(startsOn, number)}
+                </Text>
+              ) : null}
             </Pressable>
           );
         })}
@@ -627,8 +781,9 @@ export default function PlanEditor() {
         <Text style={styles.cardTitle}>
           {editingId ? `Edit ${planDayLabel(Number(day))}, week ${week}` : `Add a workout to week ${week}`}
         </Text>
+        {startsOn ? <Text style={styles.formDates}>{weekRange(startsOn, week)}</Text> : null}
         <View style={styles.fields}>
-          <ChipSelect label="Day" options={DAY_OPTIONS} value={day} onChange={setDay} />
+          <ChipSelect label="Day" options={dayOptions} value={day} onChange={setDay} />
           <TextField
             label="Workout"
             value={title}
@@ -739,7 +894,9 @@ export default function PlanEditor() {
         ) : null}
       </Card>
 
-      <SectionHeader title={`Week ${week}`} />
+      <SectionHeader
+        title={startsOn ? `Week ${week} · ${weekRange(startsOn, week)}` : `Week ${week}`}
+      />
 
       {shown.length === 0 ? (
         <EmptyState icon="create-outline" message="Nothing written for this week yet." />
@@ -747,7 +904,12 @@ export default function PlanEditor() {
         shown.map((workout) => (
           <Card key={workout.id} onPress={() => startEditing(workout)}>
             <View style={styles.head}>
-              <Text style={styles.day}>{planDayLabel(workout.day_of_week)}</Text>
+              <Text style={styles.day}>
+                {planDayLabel(workout.day_of_week)}
+                {startsOn
+                  ? ` · ${formatShortDate(workoutDate(startsOn, workout.week_number, workout.day_of_week)!)}`
+                  : ''}
+              </Text>
               <View style={styles.cardActions}>
                 <View style={styles.editHint}>
                   <Ionicons name="create-outline" size={15} color={c.primary} />
@@ -822,12 +984,33 @@ export default function PlanEditor() {
       />
 
       <Card>
-        <DateTimeField
-          label="Week 1 starts on"
-          value={startsOn}
-          onChange={setStartsOn}
-          hint="Athletes turned on below start the plan from this date."
-        />
+        {startsOn ? (
+          <Text style={styles.body}>
+            Everyone turned on below runs week 1 from {weekRange(startsOn, 1)}. To change it, use
+            Change start on the calendar.
+          </Text>
+        ) : (
+          <Text style={[styles.body, styles.calendarHintPicking]}>
+            Pick the week training starts on the calendar at the top before turning anyone on.
+          </Text>
+        )}
+        {outOfStep > 0 ? (
+          <View style={styles.outOfStep}>
+            <Text style={styles.outOfStepText}>
+              {outOfStep === 1 ? '1 runner starts' : `${outOfStep} runners start`} on a different
+              week from the rest of the plan.
+            </Text>
+            <Button
+              label="Line everyone up"
+              variant="secondary"
+              loading={startSaving}
+              onPress={() => {
+                const monday = startsOn ? workoutDate(startsOn, 1, 1) : null;
+                if (monday) void saveStart(monday);
+              }}
+            />
+          </View>
+        ) : null}
       </Card>
 
       {athletes.length === 0 ? (
@@ -977,7 +1160,13 @@ const makeStyles = (c: Palette) =>
     backgroundColor: c.surface,
   },
   weekChipSelected: { backgroundColor: c.primarySurface, borderColor: c.primary },
-  weekText: { ...type.label, color: c.textMuted },
+  weekText: { ...type.label, color: c.textMuted, textAlign: 'center' },
+  weekDates: { ...type.caption, color: c.textFaint, textAlign: 'center' },
+  calendarHint: { ...type.caption, color: c.textMuted, marginTop: spacing.xs, marginBottom: spacing.md },
+  calendarHintPicking: { color: c.accent, fontWeight: '700' },
+  formDates: { ...type.caption, color: c.textMuted, marginTop: spacing.xs },
+  outOfStep: { gap: spacing.sm, marginTop: spacing.md },
+  outOfStepText: { ...type.caption, color: c.warning, fontWeight: '700' },
   weekTextSelected: { color: c.textInverse },
   cardTitle: { ...type.heading, color: c.text },
   fields: { gap: spacing.lg, marginTop: spacing.lg },

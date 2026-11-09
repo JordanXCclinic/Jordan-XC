@@ -1,6 +1,6 @@
 import { localDateKey } from '../lib/format';
 import { milesByDay, plannedMiles, weekDays } from '../lib/mileage';
-import { mondayOf, planWeekOf } from '../lib/training';
+import { monthWeeks, mondayOf, planWeekOf, workoutDate } from '../lib/training';
 
 // Run with TZ=America/Chicago as well: weeks must not slide across the
 // November clock change, and dates must be Birmingham's, not London's.
@@ -101,5 +101,32 @@ describe('planWeekOf', () => {
 describe('localDateKey', () => {
   it('uses the local date, not the London one', () => {
     expect(localDateKey(new Date(2026, 9, 2, 22, 45))).toBe('2026-10-02');
+  });
+});
+
+describe('monthWeeks', () => {
+  it('runs Monday-first from the week of the 1st to the week of the last day', () => {
+    // November 2026 starts on a Sunday and ends on a Monday.
+    const rows = monthWeeks(new Date(2026, 10, 18)).map(localDateKey);
+    expect(rows).toEqual([
+      '2026-10-26',
+      '2026-11-02',
+      '2026-11-09',
+      '2026-11-16',
+      '2026-11-23',
+      '2026-11-30',
+    ]);
+  });
+
+  it('starts on the 1st when the month begins on a Monday', () => {
+    const rows = monthWeeks(new Date(2027, 1, 1)).map(localDateKey);
+    expect(rows[0]).toBe('2027-02-01');
+    expect(rows).toHaveLength(4);
+  });
+});
+
+describe('workoutDate', () => {
+  it('puts week 3 Wednesday two weeks and two days after the start', () => {
+    expect(localDateKey(workoutDate('2026-11-16', 3, 3)!)).toBe('2026-12-02');
   });
 });
