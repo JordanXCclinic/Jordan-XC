@@ -10,7 +10,8 @@ import { firstName } from '../lib/format';
 import { isSupabaseConfigured, supabase } from '../lib/supabase';
 import { radius, spacing, type, type Palette } from '../lib/theme';
 
-type Waiting = { family_id: string; runner_name: string };
+/** invite_id tells brothers and sisters apart: they share a family_id (0029). */
+type Waiting = { family_id: string; runner_name: string; invite_id?: string };
 
 /**
  * For each of a parent's runners who has no account yet: "Runner without a
@@ -54,7 +55,7 @@ export function SetUpRunnerCards({
       ) : null}
       {waiting.map((runner) => (
         <SetUpRunner
-          key={runner.family_id}
+          key={runner.invite_id ?? runner.family_id}
           runner={runner}
           onSetUp={async (name) => {
             await onSetUp();
@@ -89,6 +90,8 @@ function SetUpRunner({
     const { data, error: rpcError } = await supabase.rpc('set_up_runner', {
       p_family: runner.family_id,
       p_name: name,
+      // This runner's own code, so a sibling's is never spent in its place.
+      ...(runner.invite_id ? { p_invite: runner.invite_id } : {}),
     });
     if (rpcError) {
       setBusy(false);

@@ -16,7 +16,24 @@ import { useTheme, useThemedStyles } from '../../../lib/appearance';
 
 const SEASON = String(new Date().getFullYear());
 
-type Issued = { athlete_code: string; parent_code: string; name: string };
+/** A family's codes: one per runner, and the one parent code they share. */
+type Issued = {
+  runners: { name: string; code: string }[];
+  parentCode: string;
+  /** Added to a family that already had codes, rather than a new family. */
+  joined: boolean;
+};
+
+/** Brothers and sisters share one parent code; six is plenty for one family. */
+const MAX_RUNNERS = 6;
+
+/** "Jack", "Jack and Emmy", "Jack, Emmy and Tre". */
+function joinNames(names: string[]): string {
+  const firsts = names.map((name) => name.trim().split(/\s+/)[0] ?? name);
+  return firsts.length <= 1
+    ? (firsts[0] ?? '')
+    : `${firsts.slice(0, -1).join(', ')} and ${firsts[firsts.length - 1]}`;
+}
 
 export default function Codes() {
 
@@ -24,8 +41,12 @@ export default function Codes() {
 
   const styles = useThemedStyles(makeStyles);
 
-  const [name, setName] = useState('');
+  /** One name per runner in the family. */
+  const [names, setNames] = useState<string[]>(['']);
   const [oneOnOne, setOneOnOne] = useState(false);
+  /** Adding a brother or sister to a family that already has a parent code. */
+  const [joining, setJoining] = useState(false);
+  const [familyCode, setFamilyCode] = useState('');
   const [issued, setIssued] = useState<Issued | null>(null);
   const [codes, setCodes] = useState<InviteCode[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -57,14 +78,54 @@ export default function Codes() {
     void load();
   }, [load]);
 
+  const filled = names.map((runner) => runner.trim()).filter(Boolean);
+
+  function setNameAt(index: number, next: string) {
+    setNames((current) => current.map((runner, at) => (at === index ? next : runner)));
+    if (error) setError(null);
+  }
+
   async function onGenerate() {
+    if (filled.length === 0) return;
     setBusy(true);
     setError(null);
+    const role = oneOnOne ? 'private_client' : 'athlete';
 
-    const { data, error: rpcError } = await supabase.rpc('create_family_codes', {
-      p_full_name: name,
+    if (joining) {
+      // One at a time onto the family's parent code. Stopping at the first
+      // failure keeps what was made, and says which ones those are.
+      const made: { name: string; code: string }[] = [];
+      for (const runner of filled) {
+        const { data, error: rpcError } = await supabase.rpc('add_runner_to_family', {
+          p_parent_code: familyCode,
+          p_full_name: runner,
+          p_season: SEASON,
+          p_athlete_role: role,
+        });
+        if (rpcError || typeof data !== 'string') {
+          setError(
+            made.length > 0
+              ? `${rpcError?.message ?? 'Something went wrong'}. Codes were made for ${joinNames(made.map((m) => m.name))} only.`
+              : (rpcError?.message ?? 'Something went wrong.')
+          );
+          break;
+        }
+        made.push({ name: runner, code: data });
+      }
+      setBusy(false);
+      if (made.length > 0) {
+        setIssued({ runners: made, parentCode: familyCode.trim().toUpperCase(), joined: true });
+        setNames(['']);
+        setCopied(null);
+        await load();
+      }
+      return;
+    }
+
+    const { data, error: rpcError } = await supabase.rpc('create_family_codes_for', {
+      p_names: filled,
       p_season: SEASON,
-      p_athlete_role: oneOnOne ? 'private_client' : 'athlete',
+      p_athlete_role: role,
     });
 
     setBusy(false);
@@ -74,10 +135,15 @@ export default function Codes() {
       return;
     }
 
-    const row = Array.isArray(data) ? data[0] : data;
-    if (row) {
-      setIssued({ ...row, name: name.trim() });
-      setName('');
+    const rows =
+      (data as { runner_name: string; athlete_code: string; parent_code: string }[] | null) ?? [];
+    if (rows.length > 0) {
+      setIssued({
+        runners: rows.map((row) => ({ name: row.runner_name, code: row.athlete_code })),
+        parentCode: rows[0]!.parent_code,
+        joined: false,
+      });
+      setNames(['']);
       setCopied(null);
       await load();
     }
@@ -114,8 +180,16 @@ export default function Codes() {
     // unused athlete code on its own and the parent's could still be redeemed
     // later into an account connected to nobody — so it goes with it. A parent
     // code on its own is safe to lose: the athlete can join without one.
+    // A brother or sister still on the family keeps the parent code: it is
+    // theirs too.
+    const siblings = codes.filter(
+      (other) =>
+        other.id !== code.id &&
+        other.family_id === code.family_id &&
+        (other.role === 'athlete' || other.role === 'private_client')
+    );
     const partners =
-      code.role === 'parent' || !code.family_id
+      code.role === 'parent' || !code.family_id || siblings.length > 0
         ? []
         : codes.filter(
             (other) =>
@@ -173,21 +247,82 @@ export default function Codes() {
     <Screen
       inStack
       title="Clinic codes"
-      subtitle={`Season ${SEASON}. Issue a pair once a family has registered on the website, or add a coach.`}
+      subtitle={`Season ${SEASON}. Issue codes once a family has registered on the website, or add a coach.`}
       onRefresh={load}
       avoidKeyboard
     >
       <Card accent="primary">
-        <Text style={styles.cardTitle}>Issue a pair</Text>
+        <Text style={styles.cardTitle}>Issue codes for a family</Text>
+        <Text style={styles.hint}>
+          Each runner gets their own code. Brothers and sisters share one parent code, so a parent
+          signs in once and switches between their runners.
+        </Text>
         <View style={styles.fields}>
-          <TextField
-            label="Athlete name"
-            value={name}
-            onChangeText={setName}
-            placeholder="Sam Runner"
-            required
-            autoCapitalize="words"
+          <SwitchRow
+            label="Adding to a family that already has codes"
+            hint="A brother or sister of a runner you have issued codes for before."
+            value={joining}
+            onValueChange={(next) => {
+              setJoining(next);
+              setError(null);
+            }}
           />
+          {joining ? (
+            <TextField
+              label="That family’s parent code"
+              value={familyCode}
+              onChangeText={(next) => {
+                setFamilyCode(next);
+                if (error) setError(null);
+              }}
+              placeholder="ABCDEFGHJK"
+              autoCapitalize="characters"
+              hint="It is in the list below, used or not. The parent keeps using the same code."
+              required
+            />
+          ) : null}
+          {names.map((runner, index) => (
+            <View key={index} style={styles.nameRow}>
+              <View style={styles.nameField}>
+                <TextField
+                  label={
+                    index === 0
+                      ? joining
+                        ? 'Brother or sister’s name'
+                        : 'Athlete name'
+                      : 'Brother or sister’s name'
+                  }
+                  value={runner}
+                  onChangeText={(next) => setNameAt(index, next)}
+                  placeholder={index === 0 ? 'Sam Runner' : 'Alex Runner'}
+                  required={index === 0}
+                  autoCapitalize="words"
+                  maxLength={80}
+                />
+              </View>
+              {index > 0 ? (
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={`Remove ${runner.trim() || 'this runner'}`}
+                  onPress={() => setNames((current) => current.filter((_, at) => at !== index))}
+                  hitSlop={8}
+                  style={({ pressed }) => [styles.removeName, pressed && styles.pressed]}
+                >
+                  <Ionicons name="close-circle" size={22} color={c.textFaint} />
+                </Pressable>
+              ) : null}
+            </View>
+          ))}
+          {names.length < MAX_RUNNERS ? (
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => setNames((current) => [...current, ''])}
+              style={({ pressed }) => [styles.addName, pressed && styles.pressed]}
+            >
+              <Ionicons name="add-circle-outline" size={18} color={c.primary} />
+              <Text style={styles.addNameText}>Add a brother or sister</Text>
+            </Pressable>
+          ) : null}
           <SwitchRow
             label="One-on-one client"
             hint="Private coaching rather than the summer clinic."
@@ -199,10 +334,10 @@ export default function Codes() {
         {error ? <Text style={styles.error}>{error}</Text> : null}
 
         <Button
-          label="Generate codes"
+          label={filled.length > 1 ? `Generate codes for ${filled.length} runners` : 'Generate codes'}
           full
           loading={busy}
-          disabled={!name.trim()}
+          disabled={filled.length === 0 || (joining && !familyCode.trim())}
           onPress={onGenerate}
           style={styles.submit}
         />
@@ -210,37 +345,55 @@ export default function Codes() {
 
       {issued ? (
         <Card accent="primary">
-          <Text style={styles.cardTitle}>Codes for {issued.name}</Text>
+          <Text style={styles.cardTitle}>
+            Codes for {joinNames(issued.runners.map((runner) => runner.name))}
+          </Text>
           <Text style={styles.hint}>
-            Send the athlete code to the runner and the parent code to their guardian. Each one
-            works once, and either can be redeemed first.
+            {issued.joined
+              ? `They join the family on its parent code, ${issued.parentCode}. A parent already signed in sees them once each runner signs in, or sets them up from the Profile tab if they have no phone.`
+              : issued.runners.length > 1
+                ? `Send the parent code to the parent: it covers ${joinNames(issued.runners.map((runner) => runner.name))}. Send each athlete code to the runner it names. A runner without a phone needs no code: the parent sets them up.`
+                : 'Send the athlete code to the runner and the parent code to their guardian. Each one works once, and either can be redeemed first.'}
           </Text>
 
-          {(
-            [
-              ['Athlete', issued.athlete_code],
-              ['Parent', issued.parent_code],
-            ] as const
-          ).map(([kind, value]) => (
+          {[
+            ...issued.runners.map((runner, index) => ({
+              key: `athlete-${index}`,
+              label: issued.runners.length > 1 ? `Athlete · ${runner.name}` : 'Athlete',
+              value: runner.code,
+            })),
+            ...(issued.joined
+              ? []
+              : [
+                  {
+                    key: 'parent',
+                    label:
+                      issued.runners.length > 1
+                        ? `Parent · one code for ${joinNames(issued.runners.map((runner) => runner.name))}`
+                        : 'Parent',
+                    value: issued.parentCode,
+                  },
+                ]),
+          ].map(({ key, label, value }) => (
             <Pressable
-              key={kind}
+              key={key}
               accessibilityRole="button"
-              accessibilityLabel={`Copy the ${kind.toLowerCase()} code`}
-              onPress={() => copy(kind, value)}
+              accessibilityLabel={`Copy the code: ${label}`}
+              onPress={() => copy(key, value)}
               style={({ pressed }) => [styles.codeRow, pressed && styles.pressed]}
             >
               <View style={styles.codeText}>
-                <Text style={styles.codeLabel}>{kind}</Text>
+                <Text style={styles.codeLabel}>{label}</Text>
                 <Text style={styles.code}>{value}</Text>
               </View>
               <View style={styles.copy}>
                 <Ionicons
-                  name={copied === kind ? 'checkmark-circle' : 'copy-outline'}
+                  name={copied === key ? 'checkmark-circle' : 'copy-outline'}
                   size={17}
-                  color={copied === kind ? c.success : c.primary}
+                  color={copied === key ? c.success : c.primary}
                 />
-                <Text style={[styles.copyText, copied === kind && styles.copiedText]}>
-                  {copied === kind ? 'Copied' : 'Copy'}
+                <Text style={[styles.copyText, copied === key && styles.copiedText]}>
+                  {copied === key ? 'Copied' : 'Copy'}
                 </Text>
               </View>
             </Pressable>
@@ -393,4 +546,9 @@ const makeStyles = (c: Palette) =>
   rowCodeWrap: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   rowCode: { ...type.bodyStrong, color: c.primary, letterSpacing: 1.5 },
   delete: { paddingLeft: spacing.sm },
+  nameRow: { flexDirection: 'row', alignItems: 'flex-end', gap: spacing.sm },
+  nameField: { flex: 1 },
+  removeName: { paddingBottom: spacing.md },
+  addName: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, alignSelf: 'flex-start' },
+  addNameText: { ...type.label, color: c.primary },
 });

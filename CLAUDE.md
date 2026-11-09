@@ -32,8 +32,12 @@ name and phone self-editable and everything else locked. Never add a client
 write path to `role`; that reopens a privilege escalation the tests cover.
 
 Athlete and parent codes share a `family_id`, and the guardian link forms
-whichever of the two redeems first, so neither has to go first. Codes are one
-pair per child. A signed-in parent uses `add_athlete_to_family()` for another
+whichever of the two redeems first, so neither has to go first. Each child has
+their own athlete code; brothers and sisters share one `family_id` and one
+parent code (`create_family_codes_for()`, or `add_runner_to_family()` onto an
+existing family), so one parent code links a parent to all of them and the
+app's runner switcher does the rest. Older families may still hold one pair
+per child. A signed-in parent uses `add_athlete_to_family()` for another
 child's parent code, or to claim their own runner with the athlete code — which
 only links and never spends the code, so a runner with a phone can still sign
 in with it. A runner without a phone is set up by name with `set_up_runner()` — asked at

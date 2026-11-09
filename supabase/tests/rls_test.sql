@@ -1791,3 +1791,146 @@ begin
   else raise notice 'FAIL: a runner moved a plan''s start';
   end if;
 end $$;
+
+-- Brothers and sisters (0029): one parent code for every runner in a family.
+reset role;
+insert into auth.users (id) values
+  ('b5000000-0000-0000-0000-000000000001'),  -- the parent
+  ('b5000000-0000-0000-0000-000000000002'),  -- Jack, who has a phone
+  ('b5000000-0000-0000-0000-000000000003'),  -- second family's parent
+  ('b5000000-0000-0000-0000-000000000004');  -- second family's runner
+create table sib_codes (runner_name text, athlete_code text, parent_code text);
+grant all on sib_codes to authenticated;
+
+set role authenticated;
+select set_config('request.jwt.claim.sub', 'd3000000-0000-0000-0000-000000000001', false);
+insert into sib_codes select * from create_family_codes_for(array['Jack Sib', ' ', 'Emmy Sib'], '2026', 'private_client');
+do $$
+begin
+  if (select count(*) from sib_codes) = 2
+     and (select count(distinct parent_code) from sib_codes) = 1
+     and (select count(distinct athlete_code) from sib_codes) = 2
+     and (select role from invite_codes where code = (select athlete_code from sib_codes where runner_name = 'Emmy Sib')) = 'private_client'
+  then raise notice 'PASS: a coach issues one parent code for two runners';
+  else raise notice 'FAIL: sibling codes were wrong';
+  end if;
+end $$;
+
+-- The parent signs in with the one code and sees both runners waiting.
+select set_config('request.jwt.claim.sub', 'b5000000-0000-0000-0000-000000000001', false);
+select redeem_invite_code((select parent_code from sib_codes limit 1));
+do $$
+begin
+  if (select count(distinct invite_id) from my_runners_to_set_up()) = 2
+  then raise notice 'PASS: one parent code shows both runners to set up';
+  else raise notice 'FAIL: the parent did not see both runners';
+  end if;
+end $$;
+
+do $$
+begin
+  perform create_family_codes_for(array['Sneaky'], '2026');
+  raise notice 'FAIL: a parent issued codes';
+exception when others then
+  raise notice 'PASS: only coaches issue family codes (%)', sqlerrm;
+end $$;
+
+-- Emmy has no phone and is set up by name. That must spend Emmy's code, not
+-- Jack's, though Jack's is older.
+select set_config('test.emmy',
+  set_up_runner((select family_id from my_runners_to_set_up() limit 1), 'Emmy Sib')::text, false);
+-- Parents cannot read invite_codes, so the check runs as the owner.
+reset role;
+do $$
+begin
+  if (select redeemed_by from invite_codes
+       where code = (select athlete_code from sib_codes where runner_name = 'Emmy Sib'))
+       = current_setting('test.emmy')::uuid
+     and (select redeemed_at from invite_codes
+           where code = (select athlete_code from sib_codes where runner_name = 'Jack Sib')) is null
+  then raise notice 'PASS: setting up one sibling spends that sibling''s code';
+  else raise notice 'FAIL: setting up Emmy spent the wrong code';
+  end if;
+end $$;
+set role authenticated;
+
+-- Jack signs in on his own phone with his own code, and the parent sees both.
+select set_config('request.jwt.claim.sub', 'b5000000-0000-0000-0000-000000000002', false);
+select redeem_invite_code((select athlete_code from sib_codes where runner_name = 'Jack Sib'));
+select set_config('request.jwt.claim.sub', 'b5000000-0000-0000-0000-000000000001', false);
+do $$
+begin
+  if (select count(*) from guardian_links where guardian_id = auth.uid()) = 2
+     and can_view_athlete(auth.uid(), 'b5000000-0000-0000-0000-000000000002')
+  then raise notice 'PASS: one parent code links a parent to both runners';
+  else raise notice 'FAIL: the parent is not linked to both runners';
+  end if;
+end $$;
+
+-- A third child joins the family later under the same parent code.
+select set_config('request.jwt.claim.sub', 'd3000000-0000-0000-0000-000000000001', false);
+do $$
+declare v_code text;
+begin
+  v_code := add_runner_to_family(lower((select parent_code from sib_codes limit 1)), 'Third Sib', '2026');
+  if (select family_id from invite_codes where code = v_code)
+       = (select family_id from invite_codes where code = (select parent_code from sib_codes limit 1))
+  then raise notice 'PASS: a coach adds a runner to a family by its parent code';
+  else raise notice 'FAIL: the added runner is in the wrong family';
+  end if;
+end $$;
+
+do $$
+begin
+  perform add_runner_to_family('NOSUCHCODE', 'Nobody', '2026');
+  raise notice 'FAIL: a runner was added to a family that does not exist';
+exception when others then
+  raise notice 'PASS: adding to an unknown family is refused (%)', sqlerrm;
+end $$;
+
+select set_config('request.jwt.claim.sub', 'b5000000-0000-0000-0000-000000000001', false);
+do $$
+declare v_kid uuid;
+begin
+  v_kid := set_up_runner((select family_id from my_runners_to_set_up()), 'Tre',
+                         (select invite_id from my_runners_to_set_up()));
+  if (select count(*) from guardian_links where guardian_id = auth.uid()) = 3
+  then raise notice 'PASS: the added runner is set up under the same parent';
+  else raise notice 'FAIL: the added runner was not linked';
+  end if;
+end $$;
+
+-- Removing one runner leaves the parent, who still has the others.
+select set_config('request.jwt.claim.sub', 'd3000000-0000-0000-0000-000000000001', false);
+do $$
+begin
+  perform remove_from_clinic('b5000000-0000-0000-0000-000000000002');
+  if exists (select 1 from profiles where id = 'b5000000-0000-0000-0000-000000000001')
+  then raise notice 'PASS: removing one sibling keeps their parent';
+  else raise notice 'FAIL: removing one sibling removed the parent';
+  end if;
+end $$;
+
+-- A parent whose other child has not signed in yet is not removed with the
+-- first, and that child's code still works.
+reset role;
+truncate sib_codes;
+set role authenticated;
+select set_config('request.jwt.claim.sub', 'd3000000-0000-0000-0000-000000000001', false);
+insert into sib_codes select * from create_family_codes_for(array['Solo A', 'Solo B'], '2026');
+select set_config('request.jwt.claim.sub', 'b5000000-0000-0000-0000-000000000003', false);
+select redeem_invite_code((select parent_code from sib_codes limit 1));
+select set_config('request.jwt.claim.sub', 'b5000000-0000-0000-0000-000000000004', false);
+select redeem_invite_code((select athlete_code from sib_codes where runner_name = 'Solo A'));
+select set_config('request.jwt.claim.sub', 'd3000000-0000-0000-0000-000000000001', false);
+do $$
+begin
+  perform remove_from_clinic('b5000000-0000-0000-0000-000000000004');
+  if exists (select 1 from profiles where id = 'b5000000-0000-0000-0000-000000000003')
+     and exists (select 1 from invite_codes
+                  where code = (select athlete_code from sib_codes where runner_name = 'Solo B'))
+  then raise notice 'PASS: a sibling still to sign in keeps the parent and their code';
+  else raise notice 'FAIL: removing one runner took the waiting sibling''s family with it';
+  end if;
+end $$;
+reset role;
