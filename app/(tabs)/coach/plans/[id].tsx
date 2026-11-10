@@ -269,8 +269,8 @@ export default function PlanEditor() {
    * Week 1 begins on this Monday, for the plan and everyone on it. One date for
    * the whole group, so week 3 is the same week for every runner.
    */
-  async function saveStart(monday: Date) {
-    if (!id || !plan) return;
+  async function saveStart(monday: Date): Promise<string | null> {
+    if (!id || !plan) return null;
     const value = toDateInput(monday);
     setStartSaving(true);
     setStartError(null);
@@ -288,12 +288,28 @@ export default function PlanEditor() {
     if (writeError) {
       setStartError(`The start date was not changed — ${writeError.message}`);
       if (!planWriteError) setPlan({ ...plan, starts_on: value });
-      return;
+      return planWriteError ? null : value;
     }
 
     setPlan({ ...plan, starts_on: value });
     setStarts((current) => Object.fromEntries(Object.keys(current).map((key) => [key, value])));
     setPicking(false);
+    return value;
+  }
+
+  /**
+   * The plan's start, picking one if it has none: the coming Monday, or today
+   * if it is Monday. Assigning a runner never stalls on a date, and the coach
+   * can move it on the calendar afterwards.
+   */
+  async function ensureStart(): Promise<string | null> {
+    if (startsOn) return startsOn;
+    const monday = new Date();
+    monday.setHours(0, 0, 0, 0);
+    monday.setDate(monday.getDate() + ((8 - (monday.getDay() || 7)) % 7));
+    const saved = await saveStart(monday);
+    if (!saved) setAssignError('Pick the week training starts on the calendar at the top first.');
+    return saved;
   }
 
   function pickWeek(monday: Date) {
@@ -523,10 +539,8 @@ export default function PlanEditor() {
 
   async function assignAll() {
     if (!id || !profile || unassigned.length === 0) return;
-    if (!startsOn) {
-      setAssignError('Pick the week training starts on the calendar at the top first.');
-      return;
-    }
+    const start = await ensureStart();
+    if (!start) return;
 
     // Only the ones not on it yet. Anyone already assigned keeps the start date
     // they were given, rather than being moved to whatever the picker says now.
@@ -540,7 +554,7 @@ export default function PlanEditor() {
       adding.map((athlete) => ({
         plan_id: id,
         athlete_id: athlete.id,
-        starts_on: startsOn,
+        starts_on: start,
         assigned_by: profile.id,
       })),
       { onConflict: 'plan_id,athlete_id' }
@@ -555,16 +569,14 @@ export default function PlanEditor() {
     }
     setStarts((current) => ({
       ...current,
-      ...Object.fromEntries(adding.map((athlete) => [athlete.id, startsOn])),
+      ...Object.fromEntries(adding.map((athlete) => [athlete.id, start])),
     }));
   }
 
   async function toggleAssignment(athlete: Profile, next: boolean) {
     if (!id || !profile) return;
-    if (next && !startsOn) {
-      setAssignError('Pick the week training starts on the calendar at the top first.');
-      return;
-    }
+    const start = next ? await ensureStart() : startsOn;
+    if (next && !start) return;
 
     // Flip the switch here and leave the rest of the page alone. Reloading
     // everything meant a coach assigning a squad was thrown back to the top of
@@ -587,7 +599,7 @@ export default function PlanEditor() {
           {
             plan_id: id,
             athlete_id: athlete.id,
-            starts_on: startsOn,
+            starts_on: start,
             assigned_by: profile.id,
           },
           { onConflict: 'plan_id,athlete_id' }
@@ -605,7 +617,7 @@ export default function PlanEditor() {
       setAssignError(`${athlete.full_name} could not be changed — ${writeError.message}`);
       return;
     }
-    if (next && startsOn) setStarts((current) => ({ ...current, [athlete.id]: startsOn }));
+    if (next && start) setStarts((current) => ({ ...current, [athlete.id]: start }));
   }
 
   // The coach's paces live in a notebook at practice; the app only records which
@@ -990,8 +1002,9 @@ export default function PlanEditor() {
             Change start on the calendar.
           </Text>
         ) : (
-          <Text style={[styles.body, styles.calendarHintPicking]}>
-            Pick the week training starts on the calendar at the top before turning anyone on.
+          <Text style={styles.body}>
+            Pick the week training starts on the calendar at the top. If you turn someone on first,
+            it starts the coming Monday, and you can change it.
           </Text>
         )}
         {outOfStep > 0 ? (

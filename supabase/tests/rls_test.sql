@@ -1934,3 +1934,56 @@ begin
   end if;
 end $$;
 reset role;
+
+-- Parents see their runner's training (0030): the plan and its workouts, for
+-- their own runner only.
+reset role;
+insert into auth.users (id) values
+  ('b6000000-0000-0000-0000-000000000001'),  -- parent
+  ('b6000000-0000-0000-0000-000000000002'),  -- their runner, no phone
+  ('b6000000-0000-0000-0000-000000000003');  -- another family's parent
+insert into profiles (id, full_name, role, managed) values
+  ('b6000000-0000-0000-0000-000000000001', 'Pat Parent', 'parent', false),
+  ('b6000000-0000-0000-0000-000000000002', 'Kit Runner', 'private_client', true),
+  ('b6000000-0000-0000-0000-000000000003', 'Other Parent', 'parent', false);
+insert into guardian_links (athlete_id, guardian_id)
+values ('b6000000-0000-0000-0000-000000000002', 'b6000000-0000-0000-0000-000000000001');
+insert into training_plans (id, name, audience, created_by)
+values ('b6100000-0000-0000-0000-000000000001', 'Kit''s plan', 'private', 'd3000000-0000-0000-0000-000000000001');
+insert into workouts (plan_id, week_number, day_of_week, title)
+values ('b6100000-0000-0000-0000-000000000001', 1, 1, 'Easy 2 miles');
+insert into plan_assignments (plan_id, athlete_id, starts_on, assigned_by)
+values ('b6100000-0000-0000-0000-000000000001', 'b6000000-0000-0000-0000-000000000002',
+        '2026-11-16', 'd3000000-0000-0000-0000-000000000001');
+
+set role authenticated;
+select set_config('request.jwt.claim.sub', 'b6000000-0000-0000-0000-000000000001', false);
+do $$
+begin
+  if exists (select 1 from training_plans where id = 'b6100000-0000-0000-0000-000000000001')
+     and exists (select 1 from workouts where plan_id = 'b6100000-0000-0000-0000-000000000001')
+  then raise notice 'PASS: a parent sees their runner''s plan and workouts';
+  else raise notice 'FAIL: a parent cannot see their runner''s training';
+  end if;
+end $$;
+
+select set_config('request.jwt.claim.sub', 'b6000000-0000-0000-0000-000000000003', false);
+do $$
+begin
+  if not exists (select 1 from training_plans where id = 'b6100000-0000-0000-0000-000000000001')
+     and not exists (select 1 from workouts where plan_id = 'b6100000-0000-0000-0000-000000000001')
+  then raise notice 'PASS: another family''s parent sees none of that training';
+  else raise notice 'FAIL: a parent saw another family''s training';
+  end if;
+end $$;
+
+do $$
+begin
+  update training_plans set name = 'Mine now' where id = 'b6100000-0000-0000-0000-000000000001';
+  insert into workouts (plan_id, week_number, day_of_week, title)
+  values ('b6100000-0000-0000-0000-000000000001', 1, 2, 'Sneaky');
+  raise notice 'FAIL: a parent wrote to a training plan';
+exception when others then
+  raise notice 'PASS: parents cannot change training (%)', sqlerrm;
+end $$;
+reset role;
