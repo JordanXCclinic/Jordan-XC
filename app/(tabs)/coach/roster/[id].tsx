@@ -3,39 +3,30 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 import { AthleteSummary } from '../../../../components/AthleteSummary';
+import {
+  AthleteTrainingWeeks,
+  type RosterAssignment,
+} from '../../../../components/AthleteTrainingWeeks';
 import { Avatar } from '../../../../components/Avatar';
 import { Badge } from '../../../../components/Badge';
 import { Button } from '../../../../components/Button';
 import { Card } from '../../../../components/Card';
 import { EmptyState, LoadingState, Screen, SectionHeader } from '../../../../components/Screen';
 import { confirmDestructive } from '../../../../lib/confirm';
-import {
-  formatDate,
-  formatDuration,
-  formatMiles,
-  formatPace,
-  formatSplits,
-  roleLabel,
-} from '../../../../lib/format';
+import { roleLabel } from '../../../../lib/format';
 import { isSupabaseConfigured, supabase } from '../../../../lib/supabase';
-import { PROFILE_COLUMNS,
-  WORKOUT_LOG_COLUMNS,
-  type AppRole,
-  type Profile,
-  type WorkoutLog,
-} from '../../../../lib/types';
+import { PROFILE_COLUMNS, type AppRole, type Profile } from '../../../../lib/types';
 import { spacing, type, type Palette } from '../../../../lib/theme';
 import { useTheme, useThemedStyles } from '../../../../lib/appearance';
 
-type LoggedRun = WorkoutLog & {
-  workouts: { split_labels: string[] | null } | { split_labels: string[] | null }[] | null;
+type AssignmentRow = {
+  plan_id: string;
+  starts_on: string;
+  pace_group: number | null;
+  // A many-to-one embed, which PostgREST returns as an object; read an array
+  // too rather than trust the inference.
+  training_plans: { name: string } | { name: string }[] | null;
 };
-
-/** A ladder's distances for the workout a run was logged against, if any. */
-function ladderOf(log: LoggedRun): string[] | null {
-  const workout = Array.isArray(log.workouts) ? log.workouts[0] : log.workouts;
-  return workout?.split_labels ?? null;
-}
 
 export default function AthleteDetail() {
 
@@ -46,10 +37,9 @@ export default function AthleteDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const [athlete, setAthlete] = useState<Profile | null>(null);
   const [guardians, setGuardians] = useState<Profile[]>([]);
-  const [plan, setPlan] = useState<{ name: string; starts_on: string } | null>(null);
-  const [logs, setLogs] = useState<LoggedRun[]>([]);
-  /** Names for logs a parent entered, so the coach knows whose account it is. */
-  const [loggedByNames, setLoggedByNames] = useState<Record<string, string>>({});
+  const [assignment, setAssignment] = useState<RosterAssignment | null>(null);
+  /** Bumped on pull-to-refresh so the training section reloads with the rest. */
+  const [refreshKey, setRefreshKey] = useState(0);
   const [loading, setLoading] = useState(true);
   const [removing, setRemoving] = useState(false);
   const [removeError, setRemoveError] = useState<string | null>(null);
@@ -61,62 +51,35 @@ export default function AthleteDetail() {
     }
     setLoading(true);
 
-    const [{ data: row }, { data: links }, { data: assignment }, { data: logRows }] =
-      await Promise.all([
-        supabase.from('profiles').select(PROFILE_COLUMNS).eq('id', id).maybeSingle(),
-        supabase.from('guardian_links').select('guardian_id').eq('athlete_id', id),
-        supabase
-          .from('plan_assignments')
-          .select('starts_on, training_plans(name)')
-          .eq('athlete_id', id)
-          .order('starts_on', { ascending: false })
-          .limit(1)
-          .maybeSingle(),
-        supabase
-          .from('workout_logs')
-          // The workout's ladder, if it has one, names each split by its distance.
-          .select(`${WORKOUT_LOG_COLUMNS}, workouts(split_labels)`)
-          .eq('athlete_id', id)
-          .order('logged_on', { ascending: false })
-          .limit(10),
-      ]);
+    const [{ data: row }, { data: links }, { data: assigned }] = await Promise.all([
+      supabase.from('profiles').select(PROFILE_COLUMNS).eq('id', id).maybeSingle(),
+      supabase.from('guardian_links').select('guardian_id').eq('athlete_id', id),
+      supabase
+        .from('plan_assignments')
+        .select('plan_id, starts_on, pace_group, training_plans(name)')
+        .eq('athlete_id', id)
+        .order('starts_on', { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+    ]);
 
     setAthlete((row as Profile | null) ?? null);
 
-    const logList = (logRows as LoggedRun[] | null) ?? [];
-    setLogs(logList);
-
-    // Resolve only the entries somebody else wrote — a run the athlete logged
-    // themselves needs no attribution.
-    const enteredByOthers = [
-      ...new Set(
-        logList
-          .map((log) => log.logged_by)
-          .filter((who): who is string => Boolean(who) && who !== id)
-      ),
-    ];
-    if (enteredByOthers.length > 0) {
-      const { data: people } = await supabase
-        .from('profiles')
-        .select('id, full_name')
-        .in('id', enteredByOthers);
-      const names: Record<string, string> = {};
-      for (const person of (people as { id: string; full_name: string }[] | null) ?? []) {
-        names[person.id] = person.full_name;
-      }
-      setLoggedByNames(names);
-    } else {
-      setLoggedByNames({});
-    }
-
-    const assigned = assignment as
-      | { starts_on: string; training_plans: { name: string } | null }
-      | null;
-    setPlan(
-      assigned?.training_plans
-        ? { name: assigned.training_plans.name, starts_on: assigned.starts_on }
+    const current = assigned as AssignmentRow | null;
+    const plan = Array.isArray(current?.training_plans)
+      ? current?.training_plans[0]
+      : current?.training_plans;
+    setAssignment(
+      current && plan
+        ? {
+            plan_id: current.plan_id,
+            starts_on: current.starts_on,
+            pace_group: current.pace_group,
+            name: plan.name,
+          }
         : null
     );
+    setRefreshKey((key) => key + 1);
 
     const guardianIds = ((links as { guardian_id: string }[] | null) ?? []).map(
       (link) => link.guardian_id
@@ -265,49 +228,7 @@ export default function AthleteDetail() {
         ))
       )}
 
-      <SectionHeader title="Training" />
-      {plan ? (
-        <Card accent="primary">
-          <Text style={styles.planName}>{plan.name}</Text>
-          <Text style={styles.meta}>Started {formatDate(plan.starts_on)}</Text>
-        </Card>
-      ) : (
-        <EmptyState icon="barbell-outline" message="No plan assigned yet." />
-      )}
-
-      <SectionHeader title="Recent logs" />
-      {logs.length === 0 ? (
-        <EmptyState icon="footsteps-outline" message="Nothing logged yet." />
-      ) : (
-        logs.map((log) => (
-          <Card key={log.id}>
-            <View style={styles.logHead}>
-              <Text style={styles.logDate}>{formatDate(log.logged_on)}</Text>
-              {log.effort ? <Badge label={`Effort ${log.effort}/10`} tone="neutral" /> : null}
-            </View>
-            <Text style={styles.logStats}>
-              {[
-                formatMiles(log.distance_miles),
-                formatDuration(log.duration_seconds),
-                formatPace(log.distance_miles, log.duration_seconds),
-              ]
-                .filter(Boolean)
-                .join(' · ') || 'Marked done'}
-            </Text>
-            {formatSplits(log.split_seconds, ladderOf(log)) ? (
-              <Text style={styles.logSplits}>
-                Splits: {formatSplits(log.split_seconds, ladderOf(log))}
-              </Text>
-            ) : null}
-            {log.notes ? <Text style={styles.logNotes}>{log.notes}</Text> : null}
-            {log.logged_by && log.logged_by !== athlete.id ? (
-              <Text style={styles.logBy}>
-                Entered by {loggedByNames[log.logged_by] ?? 'a parent'}
-              </Text>
-            ) : null}
-          </Card>
-        ))
-      )}
+      <AthleteTrainingWeeks athleteId={athlete.id} assignment={assignment} refreshKey={refreshKey} />
 
       <View style={styles.remove}>
         <Button
@@ -338,14 +259,6 @@ const makeStyles = (c: Palette) =>
   pressed: { opacity: 0.7 },
   edit: { ...type.label, color: c.primary },
   guardianName: { ...type.bodyStrong, color: c.text },
-  planName: { ...type.heading, color: c.text },
-  meta: { ...type.caption, color: c.textMuted, marginTop: spacing.xs },
-  logHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  logDate: { ...type.bodyStrong, color: c.text },
-  logStats: { ...type.body, color: c.primary, marginTop: spacing.xs },
-  logSplits: { ...type.caption, color: c.text, marginTop: spacing.xs },
-  logNotes: { ...type.body, color: c.textMuted, marginTop: spacing.xs },
-  logBy: { ...type.caption, color: c.textFaint, marginTop: spacing.sm, fontStyle: 'italic' },
   remove: { marginTop: spacing.xxl, gap: spacing.sm },
   removeNote: { ...type.caption, color: c.textMuted, textAlign: 'center' },
   removeError: { ...type.caption, color: c.danger, textAlign: 'center' },
