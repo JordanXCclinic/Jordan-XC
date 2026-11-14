@@ -193,3 +193,14 @@ describe('ladders', () => {
     expect(formatSplits([72, 150, 70], ['400', '800', '400'])).toBe('400 1:12 · 800 2:30 · 400 1:10');
   });
 });
+
+import { splitDuration } from '../lib/format';
+
+describe('splitDuration', () => {
+  it('splits a total into hours, minutes and seconds for the wheels', () => {
+    expect(splitDuration(2730)).toEqual([0, 45, 30]);
+    expect(splitDuration(3723)).toEqual([1, 2, 3]);
+    expect(splitDuration(null)).toEqual([0, 0, 0]);
+    expect(splitDuration(0)).toEqual([0, 0, 0]);
+  });
+});

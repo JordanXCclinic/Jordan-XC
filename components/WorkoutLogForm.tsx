@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Button } from './Button';
+import { DurationField } from './DurationField';
 import { ChipSelect, TextField } from './Field';
 import {
   PLAN_DAYS,
@@ -117,7 +118,8 @@ export function WorkoutLogForm({
   const [distance, setDistance] = useState(
     entry?.distance_miles != null ? milesNumber(Number(entry.distance_miles)) : ''
   );
-  const [duration, setDuration] = useState(formatDuration(entry?.duration_seconds ?? null) ?? '');
+  /** Total seconds from the time wheels, or null when no time was given. */
+  const [duration, setDuration] = useState<number | null>(entry?.duration_seconds ?? null);
   const [effort, setEffort] = useState<number | null>(entry?.effort ?? null);
   const [notes, setNotes] = useState(entry?.notes ?? '');
   // One box per rep. A log saved before the coach changed the rep count keeps
@@ -132,11 +134,8 @@ export function WorkoutLogForm({
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Filled in as they type: distance over time, worked out for them.
-  const pace = formatPace(
-    distance.trim() ? Number(distance.trim()) : null,
-    duration.trim() ? parseDuration(duration) : null
-  );
+  // Filled in as they go: distance over time, worked out for them.
+  const pace = formatPace(distance.trim() ? Number(distance.trim()) : null, duration);
 
   async function save() {
     const miles = distance.trim() ? Number(distance.trim()) : null;
@@ -149,11 +148,8 @@ export function WorkoutLogForm({
       return;
     }
 
-    const seconds = duration.trim() ? parseDuration(duration) : null;
-    if (duration.trim() && seconds === null) {
-      setError('Time should look like 42:30.');
-      return;
-    }
+    // The wheels can only give a real time, so there is nothing to check.
+    const seconds = duration;
 
     // Reps are filled from the first one; blank boxes at the end are reps not
     // run, but a gap in the middle would put every later time on the wrong rep.
@@ -228,13 +224,7 @@ export function WorkoutLogForm({
         placeholder="6.2"
         keyboardType="decimal-pad"
       />
-      <TextField
-        label="Time"
-        value={duration}
-        onChangeText={setDuration}
-        placeholder="42:30"
-        keyboardType="numbers-and-punctuation"
-      />
+      <DurationField label="Time" value={duration} onChange={setDuration} />
 
       {pace ? (
         <View style={styles.pace} accessibilityLiveRegion="polite">

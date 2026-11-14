@@ -118,6 +118,15 @@ export function formatDuration(seconds: number | null): string | null {
 }
 
 /**
+ * A total time as the three wheels show it: 2730 → [0, 45, 30]. Hours stop at
+ * 9, the most the hours wheel offers.
+ */
+export function splitDuration(total: number | null): [number, number, number] {
+  const seconds = total && total > 0 ? Math.round(total) : 0;
+  return [Math.min(9, Math.floor(seconds / 3600)), Math.floor((seconds % 3600) / 60), seconds % 60];
+}
+
+/**
  * Pace from a run's distance and time: "7:32 /mi". Worked out wherever a run is
  * shown rather than stored, so it can never disagree with the distance and time
  * it came from. Null when either is missing or not a real number.
