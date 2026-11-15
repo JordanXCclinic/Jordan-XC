@@ -30,6 +30,8 @@ type ScreenProps = {
   /** Lifts content above the keyboard; set it on any screen with inputs. */
   avoidKeyboard?: boolean;
   contentStyle?: StyleProp<ViewStyle>;
+  /** Off while something on the screen is being dragged, so the page holds still. */
+  scrollEnabled?: boolean;
   children?: React.ReactNode;
 };
 
@@ -41,6 +43,7 @@ export function Screen({
   inStack,
   avoidKeyboard,
   contentStyle,
+  scrollEnabled = true,
   children,
 }: ScreenProps) {
 
@@ -78,6 +81,7 @@ export function Screen({
         { paddingBottom: insets.bottom + spacing.xxxl },
         contentStyle,
       ]}
+      scrollEnabled={scrollEnabled}
       keyboardShouldPersistTaps="handled"
       keyboardDismissMode="on-drag"
       showsVerticalScrollIndicator={false}

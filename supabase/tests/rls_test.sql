@@ -2053,3 +2053,41 @@ exception when others then
   raise notice 'PASS: a runner needs a parent signed in first (%)', sqlerrm;
 end $$;
 reset role;
+
+-- Roster order (0032): each coach keeps their own; nobody else reads or writes it.
+reset role;
+set role authenticated;
+select set_config('request.jwt.claim.sub', 'd3000000-0000-0000-0000-000000000001', false);
+insert into roster_order (coach_id, athlete_id, position)
+values ('d3000000-0000-0000-0000-000000000001', 'd3000000-0000-0000-0000-000000000002', 0);
+do $$
+begin
+  if (select count(*) from roster_order) = 1
+  then raise notice 'PASS: a coach saves their own roster order';
+  else raise notice 'FAIL: a coach could not save their roster order';
+  end if;
+end $$;
+
+select set_config('request.jwt.claim.sub', 'd3000000-0000-0000-0000-000000000002', false);
+do $$
+begin
+  if (select count(*) from roster_order) = 0
+  then raise notice 'PASS: a runner cannot see a coach''s roster order';
+  else raise notice 'FAIL: a runner saw a coach''s roster order';
+  end if;
+  insert into roster_order (coach_id, athlete_id, position)
+  values ('d3000000-0000-0000-0000-000000000002', 'd3000000-0000-0000-0000-000000000002', 0);
+  raise notice 'FAIL: a runner saved a roster order';
+exception when others then
+  raise notice 'PASS: only coaches keep a roster order (%)', sqlerrm;
+end $$;
+
+do $$
+begin
+  insert into roster_order (coach_id, athlete_id, position)
+  values ('d3000000-0000-0000-0000-000000000001', 'd3000000-0000-0000-0000-000000000002', 1);
+  raise notice 'FAIL: someone wrote into a coach''s roster order';
+exception when others then
+  raise notice 'PASS: nobody writes into another''s roster order (%)', sqlerrm;
+end $$;
+reset role;
