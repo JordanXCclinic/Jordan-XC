@@ -1987,3 +1987,69 @@ exception when others then
   raise notice 'PASS: parents cannot change training (%)', sqlerrm;
 end $$;
 reset role;
+
+-- Staff set up a waiting runner (0031): only once their parent has signed in,
+-- only staff, and the parent then sees them.
+reset role;
+insert into auth.users (id) values
+  ('b7000000-0000-0000-0000-000000000001'),  -- parent who signed in and stopped
+  ('b7000000-0000-0000-0000-000000000002');  -- someone else
+truncate sib_codes;
+set role authenticated;
+select set_config('request.jwt.claim.sub', 'd3000000-0000-0000-0000-000000000001', false);
+insert into sib_codes select * from create_family_codes_for(array['Wait One', 'Wait Two'], '2026', 'private_client');
+insert into sib_codes select n, a, p from create_family_codes_for(array['No Parent Yet'], '2026') as t(n, a, p);
+select set_config('request.jwt.claim.sub', 'b7000000-0000-0000-0000-000000000001', false);
+select redeem_invite_code((select parent_code from sib_codes where runner_name = 'Wait One'));
+
+select set_config('request.jwt.claim.sub', 'b7000000-0000-0000-0000-000000000002', false);
+do $$
+begin
+  if (select count(*) from runners_waiting_for_set_up()) = 0
+  then raise notice 'PASS: only staff see runners waiting to be set up';
+  else raise notice 'FAIL: a non-coach saw runners waiting to be set up';
+  end if;
+  perform staff_set_up_runner((select invite_id from runners_waiting_for_set_up() limit 1));
+  raise notice 'FAIL: a non-coach set up a runner';
+exception when others then
+  raise notice 'PASS: only staff set up a runner (%)', sqlerrm;
+end $$;
+
+select set_config('request.jwt.claim.sub', 'd3000000-0000-0000-0000-000000000001', false);
+do $$
+declare v_kid uuid; v_invite uuid;
+begin
+  if (select count(*) from runners_waiting_for_set_up()
+       where runner_name in ('Wait One', 'Wait Two')) = 2
+     and not exists (select 1 from runners_waiting_for_set_up() where runner_name = 'No Parent Yet')
+  then raise notice 'PASS: a coach sees both runners whose parent signed in, and not the others';
+  else raise notice 'FAIL: the waiting list was wrong';
+  end if;
+
+  select invite_id into v_invite from runners_waiting_for_set_up() where runner_name = 'Wait One';
+  v_kid := staff_set_up_runner(v_invite);
+  if (select role from profiles where id = v_kid) = 'private_client'
+     and (select managed from profiles where id = v_kid)
+     and (select full_name from profiles where id = v_kid) = 'Wait One'
+     and can_view_athlete('b7000000-0000-0000-0000-000000000001', v_kid)
+     and not exists (select 1 from runners_waiting_for_set_up() where runner_name = 'Wait One')
+  then raise notice 'PASS: a coach sets up a waiting runner under their parent';
+  else raise notice 'FAIL: the runner was not set up right';
+  end if;
+
+  begin
+    perform staff_set_up_runner(v_invite);
+    raise notice 'FAIL: a runner was set up twice';
+  exception when others then
+    raise notice 'PASS: a runner is set up only once (%)', sqlerrm;
+  end;
+end $$;
+
+do $$
+begin
+  perform staff_set_up_runner((select id from invite_codes where full_name = 'No Parent Yet'));
+  raise notice 'FAIL: a runner was set up with no parent signed in';
+exception when others then
+  raise notice 'PASS: a runner needs a parent signed in first (%)', sqlerrm;
+end $$;
+reset role;
