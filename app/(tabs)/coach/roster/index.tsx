@@ -199,9 +199,15 @@ export default function Roster() {
         >
           <Avatar name={athlete.full_name} />
           <View style={styles.text}>
-            <Text style={styles.name}>{athlete.full_name}</Text>
+            {/* Capped, so however little room a row leaves, a name never runs
+                down the screen a letter at a time. */}
+            <Text style={styles.name} numberOfLines={2}>
+              {athlete.full_name}
+            </Text>
             {athlete.graduation_year ? (
-              <Text style={styles.meta}>Class of {athlete.graduation_year}</Text>
+              <Text style={styles.meta} numberOfLines={1}>
+                Class of {athlete.graduation_year}
+              </Text>
             ) : null}
             {athlete.role === 'private_client' || athlete.managed || !athlete.onboarded_at ? (
               // Under the name rather than beside it, so two badges and the
@@ -269,7 +275,9 @@ export default function Roster() {
             <View key={runner.invite_id} style={[styles.row, styles.waitRow]}>
               <Avatar name={runner.runner_name} />
               <View style={styles.text}>
-                <Text style={styles.name}>{runner.runner_name}</Text>
+                <Text style={styles.name} numberOfLines={2}>
+                  {runner.runner_name}
+                </Text>
                 <Text style={styles.meta}>
                   Parent signed in {formatShortDate(runner.parent_signed_in_at)}
                 </Text>
@@ -354,7 +362,7 @@ const makeStyles = (c: Palette) =>
     ...shadow.card,
   },
   pressed: { opacity: 0.9 },
-  rowMain: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  rowMain: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   rowLifted: { borderColor: c.primary },
   handle: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', marginRight: -spacing.xs },
   dragHint: { ...type.caption, color: c.textMuted, marginTop: -spacing.xs },
