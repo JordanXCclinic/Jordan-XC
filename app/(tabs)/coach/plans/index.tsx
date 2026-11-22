@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useState } from 'react';
 import { router } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import { StyleSheet, Text, View } from 'react-native';
 import { Button } from '../../../../components/Button';
 import { Card, ListRow } from '../../../../components/Card';
 import { ChipSelect, TextField } from '../../../../components/Field';
 import { EmptyState, LoadingState, Screen, SectionHeader } from '../../../../components/Screen';
 import { useAuth } from '../../../../lib/auth';
+import { nextWeekStatus, type NextWeekStatus } from '../../../../lib/planStatus';
 import { isSupabaseConfigured, supabase } from '../../../../lib/supabase';
 import { AUDIENCE_LABELS,
   TRAINING_PLAN_COLUMNS,
@@ -21,7 +23,20 @@ const AUDIENCES: { value: Audience; label: string }[] = [
   { value: 'everyone', label: AUDIENCE_LABELS.everyone },
 ];
 
-type PlanRow = TrainingPlan & { workouts: { count: number }[]; plan_assignments: { count: number }[] };
+type PlanRow = TrainingPlan & {
+  starts_on: string | null;
+  workouts: { week_number: number; day_of_week: number }[];
+  plan_assignments: { count: number }[];
+};
+
+/** "Next week ready", "Next week not written", "Next week: 5 of 7 days", and how it looks. */
+function describe(status: NextWeekStatus): { text: string; tone: 'ready' | 'partial' | 'empty' | 'none' } {
+  if (status.kind === 'no-start') return { text: 'No start date yet', tone: 'none' };
+  if (status.kind === 'later') return { text: 'Starts after next week', tone: 'none' };
+  if (status.state === 'ready') return { text: 'Next week ready', tone: 'ready' };
+  if (status.state === 'empty') return { text: 'Next week not written', tone: 'empty' };
+  return { text: `Next week: ${status.filled} of 7 days`, tone: 'partial' };
+}
 
 export default function CoachPlans() {
 
@@ -48,7 +63,7 @@ export default function CoachPlans() {
     // The embedded counts save two round trips per plan on this list.
     const { data } = await supabase
       .from('training_plans')
-      .select(`${TRAINING_PLAN_COLUMNS}, workouts(count), plan_assignments(count)`)
+      .select(`${TRAINING_PLAN_COLUMNS}, starts_on, workouts(week_number, day_of_week), plan_assignments(count)`)
       .order('created_at', { ascending: false })
       .limit(40);
     setPlans((data as PlanRow[] | null) ?? []);
@@ -92,6 +107,15 @@ export default function CoachPlans() {
     if (data?.id) router.push(`/(tabs)/coach/plans/${data.id}`);
   }
 
+  // Only plans someone is on: an unassigned plan has nobody waiting on next week.
+  const statuses = plans.map((plan) => ({
+    plan,
+    assigned: plan.plan_assignments[0]?.count ?? 0,
+    status: describe(nextWeekStatus(plan.starts_on, plan.workouts)),
+  }));
+  const active = statuses.filter((row) => row.assigned > 0 && row.status.tone !== 'none');
+  const needWork = active.filter((row) => row.status.tone !== 'ready').length;
+
   return (
     <Screen
       inStack
@@ -126,23 +150,59 @@ export default function CoachPlans() {
       </Card>
 
       <SectionHeader title="Plans" />
+      {active.length > 0 ? (
+        <Text style={[styles.summary, needWork > 0 ? styles.summaryWarn : styles.summaryOk]}>
+          {needWork === 0
+            ? 'Next week is written for every plan with runners on it.'
+            : `${needWork} ${needWork === 1 ? 'plan needs' : 'plans need'} next week written.`}
+        </Text>
+      ) : null}
 
       {loading ? (
         <LoadingState />
       ) : plans.length === 0 ? (
         <EmptyState icon="barbell-outline" message="No plans yet. Create one above." />
       ) : (
-        plans.map((plan) => (
-          <ListRow
-            key={plan.id}
-            icon="barbell"
-            title={plan.name}
-            subtitle={`${plan.workouts[0]?.count ?? 0} workouts · ${
-              plan.plan_assignments[0]?.count ?? 0
-            } assigned`}
-            onPress={() => router.push(`/(tabs)/coach/plans/${plan.id}`)}
-          />
-        ))
+        statuses.map(({ plan, assigned, status }) => {
+          const showStatus = assigned > 0;
+          return (
+            <ListRow
+              key={plan.id}
+              icon="barbell"
+              title={plan.name}
+              subtitle={
+                showStatus
+                  ? `${status.text} · ${assigned} assigned`
+                  : `${plan.workouts.length} workouts · nobody assigned`
+              }
+              onPress={() => router.push(`/(tabs)/coach/plans/${plan.id}`)}
+              right={
+                showStatus && status.tone !== 'none' ? (
+                  <Ionicons
+                    accessibilityLabel={
+                      status.tone === 'ready'
+                        ? 'Next week written'
+                        : status.tone === 'empty'
+                          ? 'Next week not written'
+                          : 'Next week partly written'
+                    }
+                    name={
+                      status.tone === 'ready'
+                        ? 'checkmark-circle'
+                        : status.tone === 'empty'
+                          ? 'close-circle'
+                          : 'ellipse-outline'
+                    }
+                    size={30}
+                    color={
+                      status.tone === 'ready' ? c.success : status.tone === 'empty' ? c.danger : c.warning
+                    }
+                  />
+                ) : undefined
+              }
+            />
+          );
+        })
       )}
     </Screen>
   );
@@ -154,4 +214,7 @@ const makeStyles = (c: Palette) =>
   fields: { gap: spacing.lg, marginTop: spacing.lg },
   submit: { marginTop: spacing.lg },
   error: { ...type.caption, color: c.danger, marginTop: spacing.md },
+  summary: { ...type.bodyStrong, marginTop: -spacing.sm },
+  summaryOk: { color: c.success },
+  summaryWarn: { color: c.danger },
 });

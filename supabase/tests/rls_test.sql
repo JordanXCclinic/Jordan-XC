@@ -2091,3 +2091,24 @@ exception when others then
   raise notice 'PASS: nobody writes into another''s roster order (%)', sqlerrm;
 end $$;
 reset role;
+
+-- Rest days (0033): a workout can be a rest day, and a rest day has no splits.
+reset role;
+do $$
+begin
+  insert into workouts (plan_id, week_number, day_of_week, title, rest)
+  values ('b6100000-0000-0000-0000-000000000001', 1, 7, 'Rest day', true);
+  if (select rest from workouts where plan_id = 'b6100000-0000-0000-0000-000000000001' and day_of_week = 7)
+  then raise notice 'PASS: a coach can write a rest day';
+  else raise notice 'FAIL: the rest day was not saved';
+  end if;
+end $$;
+
+do $$
+begin
+  update workouts set split_count = 4
+   where plan_id = 'b6100000-0000-0000-0000-000000000001' and day_of_week = 7;
+  raise notice 'FAIL: a rest day was given splits';
+exception when others then
+  raise notice 'PASS: a rest day has no splits (%)', sqlerrm;
+end $$;

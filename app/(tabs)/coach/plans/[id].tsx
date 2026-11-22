@@ -119,6 +119,8 @@ export default function PlanEditor() {
   const [intensity, setIntensity] = useState('');
   /** Interval sessions: runners enter each rep's time when they log it. */
   const [splitsOn, setSplitsOn] = useState(false);
+  /** A rest day: written on purpose, so the week counts as complete (0033). */
+  const [rest, setRest] = useState(false);
   const [splitCount, setSplitCount] = useState('');
   const [splitLabel, setSplitLabel] = useState('');
   /** Same distance every rep, or a ladder with a distance for each. */
@@ -253,9 +255,12 @@ export default function PlanEditor() {
     () =>
       PLAN_DAYS.map((label, index) => {
         const date = startsOn ? workoutDate(startsOn, week, index + 1) : null;
-        return { value: String(index + 1), label: date ? `${label} ${date.getDate()}` : label };
+        // A tick on days already written, so the gaps in the week stand out.
+        const written = workouts.some((w) => w.week_number === week && w.day_of_week === index + 1);
+        const text = date ? `${label} ${date.getDate()}` : label;
+        return { value: String(index + 1), label: written ? `${text} ✓` : text };
       }),
-    [startsOn, week]
+    [startsOn, week, workouts]
   );
 
   /** A different week to write. Leaves any half-made edit behind rather than moving it. */
@@ -326,6 +331,9 @@ export default function PlanEditor() {
     [workouts, week]
   );
 
+  /** Days of the shown week with a workout or rest day on them, 0 to 7. */
+  const weekFilled = useMemo(() => new Set(shown.map((workout) => workout.day_of_week)).size, [shown]);
+
   function resetForm() {
     setEditingId(null);
     setTitle('');
@@ -333,6 +341,7 @@ export default function PlanEditor() {
     setDistanceMax('');
     setIntensity('');
     setSplitsOn(false);
+    setRest(false);
     setSplitCount('');
     setSplitLabel('');
     setSplitKind('same');
@@ -353,6 +362,7 @@ export default function PlanEditor() {
     );
     setIntensity(workout.intensity ?? '');
     setSplitsOn(workout.split_count !== null);
+    setRest(workout.rest);
     setSplitCount(workout.split_count === null ? '' : String(workout.split_count));
     setSplitLabel(workout.split_label ?? '');
     setSplitKind(workout.split_labels ? 'ladder' : 'same');
@@ -363,6 +373,39 @@ export default function PlanEditor() {
 
   async function addWorkout() {
     if (!id) return;
+
+    // A rest day is the day's entry with nothing to run: it fills the day, so
+    // the week can count as fully written, and runners see "Rest day".
+    if (rest) {
+      setSaving(true);
+      setError(null);
+      const { error: restError } = await supabase.from('workouts').upsert(
+        {
+          plan_id: id,
+          week_number: week,
+          day_of_week: Number(day),
+          title: 'Rest day',
+          description: description.trim() || null,
+          distance_miles: null,
+          distance_miles_max: null,
+          intensity: null,
+          split_count: null,
+          split_label: null,
+          split_labels: null,
+          rest: true,
+        },
+        { onConflict: 'plan_id,week_number,day_of_week' }
+      );
+      setSaving(false);
+      if (restError) {
+        setError(restError.message);
+        return;
+      }
+      resetForm();
+      await load();
+      return;
+    }
+
     if (!title.trim()) {
       setError('Give the workout a title.');
       return;
@@ -431,6 +474,7 @@ export default function PlanEditor() {
         split_count: reps,
         split_label: reps !== null && !rungs ? splitLabel.trim() || null : null,
         split_labels: rungs,
+        rest: false,
       },
       { onConflict: 'plan_id,week_number,day_of_week' }
     );
@@ -793,9 +837,22 @@ export default function PlanEditor() {
         <Text style={styles.cardTitle}>
           {editingId ? `Edit ${planDayLabel(Number(day))}, week ${week}` : `Add a workout to week ${week}`}
         </Text>
-        {startsOn ? <Text style={styles.formDates}>{weekRange(startsOn, week)}</Text> : null}
+        <Text style={[styles.formDates, weekFilled === 7 && styles.weekDone]}>
+          {startsOn ? `${weekRange(startsOn, week)} · ` : ''}
+          {weekFilled === 7
+            ? 'All 7 days written'
+            : `${weekFilled} of 7 days written. Mark rest days so the week counts as complete.`}
+        </Text>
         <View style={styles.fields}>
           <ChipSelect label="Day" options={dayOptions} value={day} onChange={setDay} />
+          <SwitchRow
+            label="Rest day"
+            hint="Nothing to run. Marks the day as done, so the week counts as fully written."
+            value={rest}
+            onValueChange={setRest}
+          />
+          {!rest ? (
+          <>
           <TextField
             label="Workout"
             value={title}
@@ -883,6 +940,8 @@ export default function PlanEditor() {
               </View>
             </View>
           ) : null}
+          </>
+          ) : null}
           <TextField
             label="Details"
             value={description}
@@ -895,7 +954,7 @@ export default function PlanEditor() {
         {error ? <Text style={styles.error}>{error}</Text> : null}
 
         <Button
-          label={editingId ? 'Save changes' : 'Add workout'}
+          label={editingId ? 'Save changes' : rest ? 'Add rest day' : 'Add workout'}
           full
           loading={saving}
           onPress={addWorkout}
@@ -939,6 +998,7 @@ export default function PlanEditor() {
             </View>
             <Text style={styles.workoutTitle}>{workout.title}</Text>
             <View style={styles.metaRow}>
+              {workout.rest ? <Badge label="Rest" /> : null}
               {formatMileRange(workout.distance_miles, workout.distance_miles_max) ? (
                 <Badge
                   label={formatMileRange(workout.distance_miles, workout.distance_miles_max)!}
@@ -950,6 +1010,7 @@ export default function PlanEditor() {
             </View>
             {workout.description ? <Text style={styles.body}>{workout.description}</Text> : null}
 
+            {workout.rest ? null : (
             <View style={styles.logs}>
               <Text style={styles.logsHead}>
                 Logged by {logsByWorkout[workout.id]?.length ?? 0} of {assigned.size}
@@ -970,6 +1031,7 @@ export default function PlanEditor() {
                 </View>
               ))}
             </View>
+            )}
           </Card>
         ))
       )}
@@ -1178,6 +1240,7 @@ const makeStyles = (c: Palette) =>
   calendarHint: { ...type.caption, color: c.textMuted, marginTop: spacing.xs, marginBottom: spacing.md },
   calendarHintPicking: { color: c.accent, fontWeight: '700' },
   formDates: { ...type.caption, color: c.textMuted, marginTop: spacing.xs },
+  weekDone: { color: c.success, fontWeight: '700' },
   outOfStep: { gap: spacing.sm, marginTop: spacing.md },
   outOfStepText: { ...type.caption, color: c.warning, fontWeight: '700' },
   weekTextSelected: { color: c.textInverse },

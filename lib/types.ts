@@ -129,11 +129,13 @@ export type Workout = {
   split_label: string | null;
   /** A ladder: each rep's distance in order, one per rep. Null when all the same. */
   split_labels: string[] | null;
+  /** A rest day, written on purpose so the week counts as complete (0033). */
+  rest: boolean;
 };
 
 export const WORKOUT_COLUMNS =
   'id, plan_id, week_number, day_of_week, title, description, distance_miles, '
-  + 'distance_miles_max, intensity, split_count, split_label, split_labels';
+  + 'distance_miles_max, intensity, split_count, split_label, split_labels, rest';
 
 export type MeetingSlot = {
   id: string;

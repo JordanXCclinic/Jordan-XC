@@ -107,3 +107,20 @@ describe('summarizeWeek', () => {
     expect(week.due).toBe(0);
   });
 });
+
+describe('summarizeWeek with rest days', () => {
+  it('reads a rest day as rest, not owed, and leaves it out of planned miles', () => {
+    const week = summarizeWeek({
+      monday,
+      today,
+      planWeek: 3,
+      workouts: [...workouts, { ...workout('tue-rest', 3, 2, null), id: 'tue', rest: true }].filter(
+        (w) => w.id !== 'tue' || 'rest' in w
+      ),
+      runs: [],
+    });
+    expect(week.days[1]!.status).toBe('rest');
+    expect(week.due).toBe(1); // Monday only
+    expect(week.planned).toEqual({ min: 16, max: 16 });
+  });
+});

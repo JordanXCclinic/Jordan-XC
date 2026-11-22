@@ -264,7 +264,8 @@ export default function Training() {
                     <Text style={styles.body}>{workout.description}</Text>
                   ) : null}
 
-                  {canLog ? (
+                  {/* A rest day has nothing to log. */}
+                  {canLog && !workout.rest ? (
                     <Pressable
                       accessibilityRole="button"
                       onPress={() => setLogging(workout)}

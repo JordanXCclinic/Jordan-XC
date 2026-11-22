@@ -22,6 +22,8 @@ export type InsightWorkout = {
   day_of_week: number;
   distance_miles: number | string | null;
   distance_miles_max: number | string | null;
+  /** A rest day (0033): written, but nothing to run or log. */
+  rest?: boolean;
 };
 
 /**
@@ -92,7 +94,9 @@ export function summarizeWeek<W extends InsightWorkout, R extends InsightRun>({
 
   const days = weekDays(monday).map((date, index) => {
     const key = localDateKey(date);
-    const workout = inWeek.find((w) => w.day_of_week === index + 1) ?? null;
+    const entry = inWeek.find((w) => w.day_of_week === index + 1) ?? null;
+    // A rest day is no workout to do: the day reads as rest unless they ran anyway.
+    const workout = entry && !entry.rest ? entry : null;
     const dayRuns = runs.filter((run) => run.logged_on === key);
     const dayMiles = round2(dayRuns.reduce((sum, run) => sum + milesOf(run), 0));
 
@@ -129,7 +133,7 @@ export function summarizeWeek<W extends InsightWorkout, R extends InsightRun>({
   return {
     days,
     miles: round2(miles),
-    planned: plannedMiles(inWeek),
+    planned: plannedMiles(inWeek.filter((w) => !w.rest)),
     due,
     done,
     effort: effortCount ? Math.round((effortSum / effortCount) * 10) / 10 : null,

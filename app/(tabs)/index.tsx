@@ -147,7 +147,7 @@ export default function Home() {
 
       {workout ? (
         <Card accent="primary" onPress={() => router.push('/(tabs)/training')}>
-          <Text style={styles.kicker}>Today&rsquo;s workout</Text>
+          <Text style={styles.kicker}>{workout.rest ? 'Today' : 'Today\u2019s workout'}</Text>
           <Text style={styles.workoutTitle}>{workout.title}</Text>
           <View style={styles.metaRow}>
             {formatMileRange(workout.distance_miles, workout.distance_miles_max) ? (
