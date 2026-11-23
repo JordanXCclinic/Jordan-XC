@@ -2,6 +2,10 @@ import { Stack } from 'expo-router';
 import { stackHeaderFor } from '../../../lib/theme';
 import { useTheme } from '../../../lib/appearance';
 
+// The Coach page sits under any coach screen opened from elsewhere, such as a
+// plan opened from the search on Home, so Back always has somewhere to go.
+export const unstable_settings = { anchor: 'index' };
+
 export default function CoachLayout() {
   const c = useTheme();
 

@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Badge } from '../../components/Badge';
 import { Card } from '../../components/Card';
 import { Logo } from '../../components/Logo';
+import { PlanSearch } from '../../components/PlanSearch';
 import { Stripes } from '../../components/Stripes';
 import { EmptyState, Screen, SectionHeader } from '../../components/Screen';
 import { SegmentedControl } from '../../components/SegmentedControl';
@@ -43,6 +44,7 @@ export default function Home() {
   const [practice, setPractice] = useState<Practice | null>(null);
   const [workout, setWorkout] = useState<Workout | null>(null);
   const [paceGroup, setPaceGroup] = useState<number | null>(null);
+  const scrollRef = useRef<ScrollView>(null);
 
   const load = useCallback(async () => {
     if (!isSupabaseConfigured) return;
@@ -131,6 +133,8 @@ export default function Home() {
       }
       onRefresh={load}
       headerRight={<Logo size={46} />}
+      scrollRef={scrollRef}
+      avoidKeyboard={isCoach(role)}
     >
       {athletes.length > 1 ? (
         <SegmentedControl
@@ -202,6 +206,13 @@ export default function Home() {
           </Card>
         ))
       )}
+
+      {isCoach(role) ? (
+        <>
+          <SectionHeader title="Training plans" />
+          <PlanSearch scrollRef={scrollRef} />
+        </>
+      ) : null}
     </Screen>
   );
 }

@@ -32,6 +32,8 @@ type ScreenProps = {
   contentStyle?: StyleProp<ViewStyle>;
   /** Off while something on the screen is being dragged, so the page holds still. */
   scrollEnabled?: boolean;
+  /** For a screen that scrolls itself, such as to keep a search box above the keyboard. */
+  scrollRef?: React.Ref<ScrollView>;
   children?: React.ReactNode;
 };
 
@@ -44,6 +46,7 @@ export function Screen({
   avoidKeyboard,
   contentStyle,
   scrollEnabled = true,
+  scrollRef,
   children,
 }: ScreenProps) {
 
@@ -73,6 +76,7 @@ export function Screen({
   const list = (
     <ScrollView
       {...web.scrollProps}
+      ref={scrollRef}
       style={styles.root}
       contentContainerStyle={[
         styles.content,

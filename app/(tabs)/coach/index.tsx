@@ -50,7 +50,7 @@ const TOOLS = [
     href: '/(tabs)/coach/roster',
     icon: 'people' as const,
     title: 'Roster',
-    subtitle: 'Athletes, health notes, contacts',
+    subtitle: 'Athletes, profiles, contacts',
   },
   {
     href: '/(tabs)/coach/meetings',
