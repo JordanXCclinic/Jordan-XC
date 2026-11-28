@@ -19,13 +19,16 @@ import { firstName,
 } from '../../lib/format';
 import { isSupabaseConfigured, supabase } from '../../lib/supabase';
 import { planPositionToday } from '../../lib/training';
+import { meetingUnderway, nextMeeting } from '../../lib/meetings';
 import { openDirections } from '../../lib/maps';
 import { ANNOUNCEMENT_COLUMNS,
+  MEETING_SLOT_COLUMNS,
   PRACTICE_COLUMNS,
   WORKOUT_COLUMNS,
   isAthlete,
   isCoach,
   type Announcement,
+  type MeetingSlot,
   type Practice,
   type Workout,
 } from '../../lib/types';
@@ -44,6 +47,7 @@ export default function Home() {
   const [practice, setPractice] = useState<Practice | null>(null);
   const [workout, setWorkout] = useState<Workout | null>(null);
   const [paceGroup, setPaceGroup] = useState<number | null>(null);
+  const [call, setCall] = useState<MeetingSlot | null>(null);
   const scrollRef = useRef<ScrollView>(null);
 
   const load = useCallback(async () => {
@@ -73,18 +77,33 @@ export default function Home() {
 
     if (!activeAthleteId) {
       setWorkout(null);
+      setCall(null);
       return;
     }
 
-    // Today's session comes from wherever the athlete is in their plan, which
-    // depends on when the plan starts as well as on the calendar date.
-    const { data: assignment } = await supabase
-      .from('plan_assignments')
-      .select('plan_id, starts_on, pace_group')
-      .eq('athlete_id', activeAthleteId)
-      .order('starts_on', { ascending: false })
-      .limit(1)
-      .maybeSingle();
+    const [{ data: assignment }, { data: meetings }] = await Promise.all([
+      // Today's session comes from wherever the athlete is in their plan, which
+      // depends on when the plan starts as well as on the calendar date.
+      supabase
+        .from('plan_assignments')
+        .select('plan_id, starts_on, pace_group')
+        .eq('athlete_id', activeAthleteId)
+        .order('starts_on', { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+      // Their next call with the coach: one the family booked, or one the coach
+      // set up with them by text (0034). From a few hours back, so a call that
+      // is under way still shows.
+      supabase
+        .from('meeting_slots')
+        .select(MEETING_SLOT_COLUMNS)
+        .eq('booked_for', activeAthleteId)
+        .gte('starts_at', new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString())
+        .order('starts_at', { ascending: true })
+        .limit(5),
+    ]);
+
+    setCall(nextMeeting((meetings as MeetingSlot[] | null) ?? []));
 
     const assigned = assignment as
       | { plan_id: string; starts_on: string; pace_group: number | null }
@@ -146,6 +165,8 @@ export default function Home() {
           onChange={setActiveAthleteId}
         />
       ) : null}
+
+      {call ? <CallCard slot={call} /> : null}
 
       <NextPractice practice={practice} />
 
@@ -290,6 +311,38 @@ function NextPractice({ practice }: { practice: Practice | null }) {
   );
 }
 
+function CallCard({ slot }: { slot: MeetingSlot }) {
+
+  const c = useTheme();
+
+  const styles = useThemedStyles(makeStyles);
+
+  const now = meetingUnderway(slot);
+  const icon = slot.mode === 'phone' ? 'call' : slot.mode === 'video' ? 'videocam' : 'people';
+  const kicker =
+    slot.mode === 'phone' ? 'Call with Coach' : slot.mode === 'video' ? 'Video call with Coach' : 'Meeting with Coach';
+
+  return (
+    <Card accent="primary" onPress={() => router.push('/meetings')}>
+      <View style={styles.callTop}>
+        <View style={styles.callIcon}>
+          <Ionicons name={icon} size={18} color={c.primary} />
+        </View>
+        <Text style={styles.callKicker}>{kicker}</Text>
+        <Badge label={now ? 'Now' : formatRelative(slot.starts_at)} tone={now ? 'success' : 'primary'} />
+      </View>
+      <Text style={styles.callDay}>{formatDayHeading(slot.starts_at)}</Text>
+      <Text style={styles.callTime}>
+        {formatTime(slot.starts_at)}
+        <Text style={styles.callLength}> · {slot.duration_minutes} min</Text>
+      </Text>
+      {slot.location ? <Text style={styles.callWhere}>{slot.location}</Text> : null}
+      {slot.notes ? <Text style={styles.workoutBody}>{slot.notes}</Text> : null}
+      {slot.topic ? <Text style={styles.callTopic}>&ldquo;{slot.topic}&rdquo;</Text> : null}
+    </Card>
+  );
+}
+
 function QuickAction({
   icon,
   label,
@@ -380,6 +433,21 @@ const makeStyles = (c: Palette) =>
   },
   heroFlagText: { ...type.caption, color: c.textInverse, fontWeight: '700', letterSpacing: 0.5 },
   kicker: { ...type.overline, color: c.primary },
+  callTop: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  callIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: radius.pill,
+    backgroundColor: c.primaryTint,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  callKicker: { ...type.overline, color: c.primary, flex: 1 },
+  callDay: { ...type.heading, color: c.text, marginTop: spacing.md },
+  callTime: { ...type.title, color: c.primary, marginTop: 2 },
+  callLength: { ...type.body, color: c.textMuted },
+  callWhere: { ...type.caption, color: c.textMuted, marginTop: spacing.xs },
+  callTopic: { ...type.body, color: c.textMuted, fontStyle: 'italic', marginTop: spacing.sm },
   workoutTitle: { ...type.heading, color: c.text, marginTop: spacing.xs },
   metaRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm, flexWrap: 'wrap' },
   workoutBody: { ...type.body, color: c.textMuted, marginTop: spacing.sm },

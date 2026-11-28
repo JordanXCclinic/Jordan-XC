@@ -148,10 +148,12 @@ export type MeetingSlot = {
   booked_by: string | null;
   booked_at: string | null;
   topic: string | null;
+  /** A call the coach arranged directly (by text) and entered already booked (0034). */
+  set_by_coach: boolean;
 };
 
 export const MEETING_SLOT_COLUMNS =
-  'id, starts_at, duration_minutes, mode, location, notes, booked_for, booked_by, booked_at, topic';
+  'id, starts_at, duration_minutes, mode, location, notes, booked_for, booked_by, booked_at, topic, set_by_coach';
 
 export type Photo = {
   id: string;

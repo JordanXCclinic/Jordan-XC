@@ -2112,3 +2112,97 @@ begin
 exception when others then
   raise notice 'PASS: a rest day has no splits (%)', sqlerrm;
 end $$;
+
+-- Calls the coach set up (0034): already booked for one runner, seen by that
+-- runner's side only, and not cancelled from a family's app.
+reset role;
+set role authenticated;
+select set_config('request.jwt.claim.sub', 'd3000000-0000-0000-0000-000000000001', false);
+do $$
+begin
+  insert into meeting_slots (id, starts_at, mode, notes, created_by,
+                             booked_for, booked_by, booked_at, set_by_coach)
+  values ('d5000000-0000-0000-0000-000000000001', now() + interval '2 days', 'phone', 'Race plan',
+          'd3000000-0000-0000-0000-000000000001', 'd3000000-0000-0000-0000-000000000002',
+          'd3000000-0000-0000-0000-000000000001', now(), true);
+  raise notice 'PASS: a coach enters a call they set up';
+exception when others then
+  raise notice 'FAIL: a coach could not enter a call they set up (%)', sqlerrm;
+end $$;
+
+do $$
+begin
+  insert into meeting_slots (starts_at, created_by, set_by_coach)
+  values (now() + interval '2 days', 'd3000000-0000-0000-0000-000000000001', true);
+  raise notice 'FAIL: a call was set up for nobody';
+exception when others then
+  raise notice 'PASS: a call the coach sets up has to be for a runner (%)', sqlerrm;
+end $$;
+
+select set_config('request.jwt.claim.sub', 'd3000000-0000-0000-0000-000000000002', false);
+do $$
+begin
+  if exists (select 1 from meeting_slots where id = 'd5000000-0000-0000-0000-000000000001' and set_by_coach)
+  then raise notice 'PASS: the runner sees the call the coach set up';
+  else raise notice 'FAIL: the runner cannot see the call the coach set up';
+  end if;
+end $$;
+
+select set_config('request.jwt.claim.sub', 'd3000000-0000-0000-0000-000000000005', false);
+do $$
+begin
+  if not exists (select 1 from meeting_slots where id = 'd5000000-0000-0000-0000-000000000001')
+  then raise notice 'PASS: another runner does not see the call';
+  else raise notice 'FAIL: another runner saw someone else''s call';
+  end if;
+end $$;
+
+select set_config('request.jwt.claim.sub', 'd3000000-0000-0000-0000-000000000003', false);
+do $$
+begin
+  if exists (select 1 from meeting_slots where id = 'd5000000-0000-0000-0000-000000000001')
+  then raise notice 'PASS: the runner''s parent sees the call';
+  else raise notice 'FAIL: the runner''s parent cannot see the call';
+  end if;
+end $$;
+
+do $$
+begin
+  perform cancel_meeting_booking('d5000000-0000-0000-0000-000000000001');
+  raise notice 'FAIL: a family cancelled a call the coach set up';
+exception when others then
+  raise notice 'PASS: a family cannot cancel a call the coach set up (%)', sqlerrm;
+end $$;
+
+reset role;
+do $$
+begin
+  if exists (select 1 from meeting_slots
+              where id = 'd5000000-0000-0000-0000-000000000001'
+                and booked_for = 'd3000000-0000-0000-0000-000000000002' and set_by_coach)
+  then raise notice 'PASS: the call stays booked for the runner';
+  else raise notice 'FAIL: the call came loose from the runner';
+  end if;
+end $$;
+
+-- Entering a call does not swallow the announcement for open times added
+-- just after it.
+insert into meeting_slots (id, starts_at, created_by, created_at,
+                           booked_for, booked_by, booked_at, set_by_coach)
+values ('d5000000-0000-0000-0000-000000000002', now() + interval '6 days',
+        'd1000000-0000-0000-0000-000000000001', now() + interval '5 days',
+        'd3000000-0000-0000-0000-000000000002', 'd1000000-0000-0000-0000-000000000001', now(), true);
+insert into meeting_slots (id, starts_at, created_by, created_at)
+values ('d5000000-0000-0000-0000-000000000003', now() + interval '6 days',
+        'd1000000-0000-0000-0000-000000000001', now() + interval '5 days 5 minutes');
+do $$
+begin
+  if not exists (select 1 from meeting_slot_recipients('d5000000-0000-0000-0000-000000000002'))
+  then raise notice 'PASS: entering a call the coach set up notifies no one';
+  else raise notice 'FAIL: a call the coach set up went out to families';
+  end if;
+  if exists (select 1 from meeting_slot_recipients('d5000000-0000-0000-0000-000000000003'))
+  then raise notice 'PASS: open times added right after a call are still announced';
+  else raise notice 'FAIL: an entered call silenced the open times after it';
+  end if;
+end $$;

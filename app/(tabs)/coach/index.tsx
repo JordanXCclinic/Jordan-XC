@@ -56,7 +56,7 @@ const TOOLS = [
     href: '/(tabs)/coach/meetings',
     icon: 'chatbubbles' as const,
     title: 'Meetings',
-    subtitle: 'Open times and who booked them',
+    subtitle: 'Calls you set up, and open times',
   },
   {
     href: '/(tabs)/coach/posts',

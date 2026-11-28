@@ -132,15 +132,22 @@ export default function Meetings() {
                     {MEETING_MODE_LABELS[slot.mode]}
                     {slot.location ? ` · ${slot.location}` : ''} · {slot.duration_minutes} min
                   </Text>
+                  {slot.set_by_coach && slot.notes ? <Text style={styles.notes}>{slot.notes}</Text> : null}
                   {slot.topic ? <Text style={styles.topic}>&ldquo;{slot.topic}&rdquo;</Text> : null}
-                  <Pressable
-                    accessibilityRole="button"
-                    onPress={() => void cancel(slot)}
-                    style={({ pressed }) => [styles.cancel, pressed && styles.pressed]}
-                  >
-                    <Ionicons name="close-circle-outline" size={16} color={c.danger} />
-                    <Text style={styles.cancelText}>Cancel this meeting</Text>
-                  </Pressable>
+                  {slot.set_by_coach ? (
+                    // The coach arranged this one directly, so it changes the
+                    // same way; cancelling here would offer the time to others.
+                    <Text style={styles.setBy}>Coach set this up with you. To change it, text Coach.</Text>
+                  ) : (
+                    <Pressable
+                      accessibilityRole="button"
+                      onPress={() => void cancel(slot)}
+                      style={({ pressed }) => [styles.cancel, pressed && styles.pressed]}
+                    >
+                      <Ionicons name="close-circle-outline" size={16} color={c.danger} />
+                      <Text style={styles.cancelText}>Cancel this meeting</Text>
+                    </Pressable>
+                  )}
                 </Card>
               ))}
             </>
@@ -260,6 +267,14 @@ const makeStyles = (c: Palette) =>
   },
   pressed: { opacity: 0.7 },
   cancelText: { ...type.label, color: c.danger },
+  setBy: {
+    ...type.caption,
+    color: c.textMuted,
+    marginTop: spacing.lg,
+    paddingTop: spacing.md,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: c.border,
+  },
   error: { ...type.caption, color: c.danger },
   hint: { ...type.caption, color: c.textFaint, textAlign: 'center' },
   backdrop: { flex: 1, backgroundColor: c.overlay },
